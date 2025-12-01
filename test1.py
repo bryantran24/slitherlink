@@ -6,6 +6,10 @@ from shadowprover.experimental.sst_prover import SST_Prover
 
 sst_prover = SST_Prover()
 
-x = sst_prover.prove(givens=["(if P Q)", "P"], goal="Q")
+print(sst_prover.prove(givens=["Q"], goal="Q"))
 
-print(x)
+r1 = sst_prover.prove(givens=["(if P Q)", "P"], goal="Q")
+print(r1)
+
+r2 = sst_prover.prove(givens=["(if P Q)", "(if Q R)", "P"], goal="R")
+print(r2)

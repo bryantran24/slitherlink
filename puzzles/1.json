@@ -1,0 +1,8 @@
+{
+  "width": 2,
+  "height": 2,
+  "puzzle": [
+    [null, 3],
+    [1, null]
+  ]
+}
