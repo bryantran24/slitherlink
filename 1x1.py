@@ -8,25 +8,31 @@ from shadowprover.syntax.reader import r
 from shadowprover.experimental.sst_prover import SST_Prover
 from shadowprover.reasoners.planner import run_spectra
 
-domain = {r("eT"), r("eR"), r("eB"), r("eL")}
+
+domain = {
+    r("c00"),
+    r("h00"), r("h01"),
+    r("v00"), r("v01"),
+}
+
 
 background = set(
-    list(
-        map(
-            r,
-            [
-                "(Edge eT)",
-                "(Edge eR)",
-                "(Edge eB)",
-                "(Edge eL)",
-                "(not (= eT eR))",
-                "(not (= eT eB))",
-                "(not (= eT eL))",
-                "(not (= eR eB))",
-                "(not (= eR eL))",
-                "(not (= eB eL))",
-            ],
-        )
+    map(
+        r,
+        [
+            # cell
+            "(Cell c00)",
+
+            # edges
+            "(Edge h00)", "(Edge h01)",
+            "(Edge v00)", "(Edge v01)",
+
+            # incidence (exactly 4 edges around the cell)
+            "(Incident h00 c00)",   # top
+            "(Incident h01 c00)",   # bottom
+            "(Incident v00 c00)",   # left
+            "(Incident v01 c00)",   # right
+        ],
     )
 )
 
@@ -43,15 +49,20 @@ start = set(
     map(
         r,
         [
-            "(Undrawn eT)",
-            "(Undrawn eR)",
-            "(Undrawn eB)",
-            "(Undrawn eL)",
+            "(Undrawn h00)",
+            "(Undrawn h01)",
+            "(Undrawn v00)",
+            "(Undrawn v01)",
         ],
     )
 )
 
-goal = r("(and (On eT) (On eR) (On eB) (On eL))")
+incident = {
+    "c00": ["h00", "h01", "v00", "v01"]
+}
+
+goal_str = "(and " + " ".join(f"(On {e})" for e in incident["c00"]) + ")"
+goal = r(goal_str)
 
 sst = SST_Prover()
 
@@ -65,4 +76,7 @@ result = run_spectra(
     verbose=False,
 )[0]
 
-print(result)
+print("GOAL:", goal_str)
+print("PLAN:")
+for i, step in enumerate(result, 1):
+    print(i, step)
