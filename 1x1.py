@@ -1,191 +1,163 @@
-import json
 import os
+import itertools
 
 os.environ["EPROVER_HOME"] = "./eprover/"
 
 from shadowprover.syntax import *
+from shadowprover.reasoners.planner import Action
 from shadowprover.syntax.reader import r
 
-with open("puzzles/3.json") as f:
-    data = json.load(f)
-
-width  = data["width"]
-height = data["height"]
-clues  = data["puzzle"]
-
-def dname(dot_row: int, dot_col: int) -> str:
-    """Return the symbolic name of a DOT at coordinates (dot_row, dot_col)."""
-    return f"d-{dot_row}-{dot_col}"
-
-def cname(cell_row: int, cell_col: int) -> str:
-    """Return the name of a CELL (puzzle square)."""
-    return f"c-{cell_row}-{cell_col}"
-
-def hename(dot_row: int, dot_col: int) -> str:
-    """Return the name of a HORIZONTAL EDGE starting at dot (dot_row, dot_col)."""
-    return f"eh-{dot_row}-{dot_col}"
-
-def vename(dot_row: int, dot_col: int) -> str:
-    """Return the name of a VERTICAL EDGE starting at dot (dot_row, dot_col)."""
-    return f"ev-{dot_row}-{dot_col}"
-
-object_names = set()
+from shadowprover.experimental.sst_prover import SST_Prover
+from shadowprover.reasoners.planner import run_spectra
 
 
-for dot_row in range(height + 1):
-    for dot_col in range(width + 1):
-        object_names.add(dname(dot_row, dot_col))
+clue_input = "c00 3"
 
+def normalize_clue_token(tok: str) -> str:
+    tok = tok.strip().lower()
+    if tok in {"zero", "one", "two", "three", "four"}:
+        return tok
+    if tok == "0": return "zero"
+    if tok == "1": return "one"
+    if tok == "2": return "two"
+    if tok == "3": return "three"
+    if tok == "4": return "four"
+    raise ValueError(f"Bad clue token: {tok}")
 
-h_edges = []
-for dot_row in range(height + 1):
-    for dot_col in range(width):
-        edge_name = hename(dot_row, dot_col)
-        h_edges.append(
-            (edge_name, (dot_row, dot_col), (dot_row, dot_col + 1))
-        )
-        object_names.add(edge_name)
-        
+cell_name, clue_tok = clue_input.split()
+clue_tok = normalize_clue_token(clue_tok)
 
-v_edges = []
-for dot_row in range(height):
-    for dot_col in range(width + 1):
-        edge_name = vename(dot_row, dot_col)
-        v_edges.append(
-            (edge_name, (dot_row, dot_col), (dot_row + 1, dot_col))
-        )
-        object_names.add(edge_name)
-        
-cell_names = []
-for cell_row in range(1, height + 1):
-    for cell_col in range(1, width + 1):
-        cell_name = cname(cell_row, cell_col)
-        cell_names.append(cell_name)
-        object_names.add(cell_name)
-        
-domain = {r(name) for name in object_names}
+domain = {
+    r("c00"),
+    r("three"),
+    r("h00"),
+    r("h01"),
+    r("v00"),
+    r("v01"),
+}
 
-print("Domain objects:")
-for obj in sorted(object_names):
-    print(" ", obj)
-print()
+incident = {"c00": ["h00", "h01", "v00", "v01"]}
+clues = {cell_name: clue_tok}
 
+background = set(
+    map(
+        r,
+        [
+            "(Cell c00)",
+            f"(Clue {cell_name} {clue_tok})",
 
-background = set()
-
-# ---- Type declarations ----
-for dot_row in range(height + 1):
-    for dot_col in range(width + 1):
-        background.add(r(f"(dot {dname(dot_row, dot_col)})"))
-
-for edge_name, _, _ in h_edges + v_edges:
-    background.add(r(f"(edge {edge_name})"))
-
-for cell_name in cell_names:
-    background.add(r(f"(cell {cell_name})"))
-    
-    
-for edge_name, (dot_row1, dot_col1), (dot_row2, dot_col2) in h_edges:
-    background.add(r(f"(incident {edge_name} {dname(dot_row1, dot_col1)})"))
-    background.add(r(f"(incident {edge_name} {dname(dot_row2, dot_col2)})"))
-
-for edge_name, (dot_row1, dot_col1), (dot_row2, dot_col2) in v_edges:
-    background.add(r(f"(incident {edge_name} {dname(dot_row1, dot_col1)})"))
-    background.add(r(f"(incident {edge_name} {dname(dot_row2, dot_col2)})"))
-    
-for cell_row in range(1, height + 1):
-    for cell_col in range(1, width + 1):
-        cell_name = cname(cell_row, cell_col)
-
-        # The four edges surrounding a cell:
-        top_edge    = hename(cell_row - 1, cell_col - 1)
-        bottom_edge = hename(cell_row,     cell_col - 1)
-        left_edge   = vename(cell_row - 1, cell_col - 1)
-        right_edge  = vename(cell_row - 1, cell_col)
-
-        for edge_name in (top_edge, bottom_edge, left_edge, right_edge):
-            background.add(r(f"(cell-edge {cell_name} {edge_name})"))
-
-        # ---- CLUES ----
-        #
-        # Represented as (clue0 C), (clue1 C), …
-        #
-        clue_value = clues[cell_row - 1][cell_col - 1]
-        if clue_value is not None:
-            background.add(r(f"(clue{clue_value} {cell_name})"))
-            
-background.add(r("""
-  (forall [?c ?e]
-    (if (and (clue4 ?c) (cell-edge ?c ?e))
-        (on ?e)))
-"""))
-
-print(f"Total background facts: {len(background)}")
-for fact in list(background):
-    print(fact)
-    
-from shadowprover.reasoners.planner import Action
+            "(Edge h00)", "(Edge h01)", "(Edge v00)", "(Edge v01)",
+            "(Incident h00 c00)",
+            "(Incident h01 c00)",
+            "(Incident v00 c00)",
+            "(Incident v01 c00)",
+        ],
+    )
+)
 
 actions = [
     Action(
-        r("(draw-line ?e)"),
-        precondition=r("(and (edge ?e) (off ?e))"),
-        additions={
-            r("(on ?e)"),
-            r("(not (off ?e))"),
-        },
-        deletions={
-            r("(off ?e)"),
-            r("(not (on ?e))"),
-        },
-    ),
-
-    Action(
-        r("(erase-edge ?e)"),
-        precondition=r("(and (edge ?e) (on ?e))"),
-        additions={
-            r("(off ?e)"),
-            r("(not (on ?e))"),
-        },
-        deletions={
-            r("(on ?e)"),
-            r("(not (off ?e))"),
-        },
-    ),
+        r("(Draw ?e)"),
+        precondition=r("(and (Edge ?e) (Undrawn ?e))"),
+        additions={r("(On ?e)")},
+        deletions={r("(Undrawn ?e)"), r("(not (On ?e))")},
+    )
 ]
 
-start = set()
-for edge_name, _, _ in h_edges + v_edges:
-    start.add(r(f"(off {edge_name})"))
-    start.add(r(f"(not (on {edge_name}))"))
+start = set(
+    map(
+        r,
+        [
+            "(Undrawn h00)", "(Undrawn h01)", "(Undrawn v00)", "(Undrawn v01)",
+            "(not (On h00))", "(not (On h01))", "(not (On v00))", "(not (On v01))",
+        ],
+    )
+)
 
-from functools import cache
-from shadowprover.fol.fol_prover import fol_prove
-from shadowprover.reasoners.planner import run_spectra
+def goal_from_clue(cell):
+    clue = clues[cell]
+    edges = incident[cell]
 
-def get_cached_prover(find_answer=True, max_answers=5):
-    @cache
-    def cached_prover(inputs, output, find_answer=find_answer, max_answers=max_answers):
-        return fol_prove(inputs, output, find_answer=find_answer, max_answers=max_answers)
-    def _prover_(inputs, output, find_answer=find_answer, max_answers=max_answers):
-        return cached_prover(frozenset(inputs), output, find_answer, max_answers=max_answers)
-    return _prover_
+    def exact_k(k):
+        cases = []
+        for on_set in itertools.combinations(edges, k):
+            on_set = set(on_set)
+            clause_parts = []
+            for e in edges:
+                clause_parts.append(f"(On {e})" if e in on_set else f"(not (On {e}))")
+            cases.append("(and " + " ".join(clause_parts) + ")")
+        return "(or " + " ".join(cases) + ")"
 
+    if clue == "zero":
+        return "(and " + " ".join(f"(not (On {e}))" for e in edges) + ")"
 
-some_edge = hename(0, 0)
-goal = r(f"(on {some_edge})")
+    if clue == "one":
+        return exact_k(1)
 
-completions = ["on", "off"]
+    if clue == "two":
+        return exact_k(2)
 
-result = run_spectra(
+    if clue == "three":
+        return exact_k(3)
+
+    if clue == "four":
+        return "(and " + " ".join(f"(On {e})" for e in edges) + ")"
+
+    raise ValueError(f"Unsupported clue: {clue}")
+
+goal_str = goal_from_clue(cell_name)
+goal = r(goal_str)
+
+sst = SST_Prover()
+
+plan = run_spectra(
     domain,
     background,
     start,
     goal,
     actions,
-    get_cached_prover(),
-    completions=completions,
-    verbose=True,
+    sst.get_cached_shadow_prover2(),
+    verbose=False,
 )[0]
 
-print("Plan:", result)
+print("CLUE INPUT:", clue_input)
+print("GOAL:", goal_str)
+print("PLAN:")
+if not plan:
+    print("  No plan found")
+else:
+    for i, step in enumerate(plan, 1):
+        print(i, step)
+
+
+def edges_on_from_plan(plan_steps):
+    on = set()
+    for step in plan_steps:
+        s = str(step).strip()
+        if s.startswith("(") and s.endswith(")"):
+            s = s[1:-1]
+        parts = s.split()
+        if len(parts) == 2 and parts[0] == "Draw":
+            on.add(parts[1])
+    return on
+
+def print_1x1_slitherlink(on_edges, clue=None):
+    dot = "●"
+    h = "───"
+    v = "│"
+    space = "   "
+
+    top = dot + (h if "h00" in on_edges else space) + dot
+    center = f" {clue} " if clue is not None else space
+    mid = (v if "v00" in on_edges else " ") + center + (v if "v01" in on_edges else " ")
+    bot = dot + (h if "h01" in on_edges else space) + dot
+
+    print(top)
+    print(mid)
+    print(bot)
+
+if plan:
+    on_edges = edges_on_from_plan(plan)
+    clue_char = {"zero":"0","one":"1","two":"2","three":"3","four":"4"}[clue_tok]
+    print("\nASCII SOLUTION:")
+    print_1x1_slitherlink(on_edges, clue=clue_char)
