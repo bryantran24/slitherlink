@@ -281,12 +281,14 @@ print("Goal", goal)
 
 constraint_goal = goal  # keep the real constraints
 
+start.add(r("(Alive)"))
+
 actions.append(
     Action(
         r("(Finish)"),
         precondition=constraint_goal,
         additions={r("(Done)")},
-        deletions=set(),
+        deletions={r("(Alive)")},
     )
 )
 
