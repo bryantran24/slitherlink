@@ -10,21 +10,15 @@ from shadowprover.experimental.sst_prover import SST_Prover
 from shadowprover.reasoners.planner import run_spectra
 
 
-# ------------------------------------------------------------
-# INPUT CLUES (example)
-# use cell coords: c00 c10 / c01 c11
-# each string: "cell value" where value is 0..4 or zero..four
-# ------------------------------------------------------------
-clue_inputs = [
-    "c00 3",
-    "c10 3",
-    "c01 3",
-    "c11 3",
-]
+# -----------------------------
+# single clue input
+# -----------------------------
+clue_input = "c00 3"
 
 def normalize_clue_token(tok: str) -> str:
     tok = tok.strip().lower()
-    if tok in {"zero","one","two","three","four"}: return tok
+    if tok in {"zero", "one", "two", "three", "four"}:
+        return tok
     if tok == "0": return "zero"
     if tok == "1": return "one"
     if tok == "2": return "two"
@@ -32,27 +26,20 @@ def normalize_clue_token(tok: str) -> str:
     if tok == "4": return "four"
     raise ValueError(f"Bad clue token: {tok}")
 
+cell_name, clue_tok = clue_input.split()
+clue_tok = normalize_clue_token(clue_tok)
 
-# ------------------------------------------------------------
-# 2x2 geometry (vertices 3x3, edges 12)
-# Vertex pXY where X,Y in {0,1,2}
-# Horizontal edge hXY connects pXY -- p(X+1)Y for X in {0,1}, Y in {0,1,2}
-# Vertical edge   vXY connects pXY -- pX(Y+1) for X in {0,1,2}, Y in {0,1}
-# Cell cXY where X,Y in {0,1} uses:
-#   top    hX,Y
-#   bottom hX,Y+1
-#   left   vX,Y
-#   right  vX+1,Y
-# ------------------------------------------------------------
+
+# -----------------------------
+# 2x2 geometry
+# -----------------------------
 cells = [f"c{x}{y}" for x in range(2) for y in range(2)]
-
 verts = [f"p{x}{y}" for x in range(3) for y in range(3)]
 
 h_edges = [f"h{x}{y}" for x in range(2) for y in range(3)]
 v_edges = [f"v{x}{y}" for x in range(3) for y in range(2)]
 edges = h_edges + v_edges
 
-# incident edges per cell
 incident_cell = {}
 for x in range(2):
     for y in range(2):
@@ -64,75 +51,59 @@ for x in range(2):
             f"v{x+1}{y}",     # right
         ]
 
-# edges touching each vertex (for degree constraints)
 touch_vertex = {p: [] for p in verts}
+
 def add_touch(e, p1, p2):
     touch_vertex[p1].append(e)
     touch_vertex[p2].append(e)
 
-# horizontal touches
 for x in range(2):
     for y in range(3):
-        e = f"h{x}{y}"
-        p1 = f"p{x}{y}"
-        p2 = f"p{x+1}{y}"
-        add_touch(e, p1, p2)
+        add_touch(f"h{x}{y}", f"p{x}{y}", f"p{x+1}{y}")
 
-# vertical touches
 for x in range(3):
     for y in range(2):
-        e = f"v{x}{y}"
-        p1 = f"p{x}{y}"
-        p2 = f"p{x}{y+1}"
-        add_touch(e, p1, p2)
+        add_touch(f"v{x}{y}", f"p{x}{y}", f"p{x}{y+1}")
 
 
-# ------------------------------------------------------------
-# Parse clues
-# ------------------------------------------------------------
-clues = {}
-for s in clue_inputs:
-    c, tok = s.split()
-    clues[c] = normalize_clue_token(tok)
+# -----------------------------
+# clues: ONLY one clue
+# -----------------------------
+clues = {cell_name: clue_tok}
 
 
-# ------------------------------------------------------------
-# DOMAIN (constants only)
-# include clue symbols that appear
-# ------------------------------------------------------------
-clue_symbols = {clues[c] for c in clues}
-domain = set(map(r, cells + verts + edges + list(clue_symbols)))
+# -----------------------------
+# domain + background
+# -----------------------------
+clue_symbols = ["zero", "one", "two", "three", "four"]
+domain = set(map(r, cells + verts + edges + clue_symbols))
 
-
-# ------------------------------------------------------------
-# BACKGROUND facts (Cell/Edge/Vertex + Clue + Incident + Touches)
-# ------------------------------------------------------------
-bg_facts = []
-
+bg = []
 for c in cells:
-    bg_facts.append(f"(Cell {c})")
+    bg.append(f"(Cell {c})")
     if c in clues:
-        bg_facts.append(f"(Clue {c} {clues[c]})")
+        bg.append(f"(Clue {c} {clues[c]})")
 
 for e in edges:
-    bg_facts.append(f"(Edge {e})")
+    bg.append(f"(Edge {e})")
 
 for p in verts:
-    bg_facts.append(f"(Vertex {p})")
+    bg.append(f"(Vertex {p})")
 
-# Incident(edge, cell)
 for c, es in incident_cell.items():
     for e in es:
-        bg_facts.append(f"(Incident {e} {c})")
+        bg.append(f"(Incident {e} {c})")
 
-# Touches(edge, vertex)
 for p, es in touch_vertex.items():
     for e in es:
-        bg_facts.append(f"(Touches {e} {p})")
+        bg.append(f"(Touches {e} {p})")
 
-background = set(map(r, bg_facts))
+background = set(map(r, bg))
 
 
+# -----------------------------
+# actions + start
+# -----------------------------
 actions = [
     Action(
         r("(Draw ?e)"),
@@ -142,50 +113,80 @@ actions = [
     )
 ]
 
-start_facts = []
-for e in edges:
-    start_facts.append(f"(Undrawn {e})")
-    start_facts.append(f"(not (On {e}))")
+start = set(map(r,
+    [f"(Undrawn {e})" for e in edges] +
+    [f"(not (On {e}))" for e in edges]
+))
 
-start = set(map(r, start_facts))
 
-def exact_k_on(edges_list, k: int) -> str:
+# -----------------------------
+# goal compilation (FIXED)
+# -----------------------------
+def contradiction():
+    # safe always-false using an existing constant
+    return "(and (On h00) (not (On h00)))"
+
+def exact_k_on(es, k):
+    # exact-k over es using explicit negations
+    n = len(es)
+    if k < 0 or k > n:
+        return contradiction()
+
+    if k == 0:
+        return "(and " + " ".join(f"(not (On {e}))" for e in es) + ")"
+    if k == n:
+        return "(and " + " ".join(f"(On {e})" for e in es) + ")"
+
     cases = []
-    for on_tuple in itertools.combinations(edges_list, k):
+    for on_tuple in itertools.combinations(es, k):
         on_set = set(on_tuple)
-        parts = [(f"(On {e})" if e in on_set else f"(not (On {e}))") for e in edges_list]
+        parts = [(f"(On {e})" if e in on_set else f"(not (On {e}))") for e in es]
         cases.append("(and " + " ".join(parts) + ")")
+
+    if not cases:
+        return contradiction()
+
     return "(or " + " ".join(cases) + ")"
 
-def clue_goal_for_cell(c: str) -> str:
-    tok = clues[c]  # zero..four
+def clue_goal_for_cell(c):
+    tok = clues[c]
     k_map = {"zero":0,"one":1,"two":2,"three":3,"four":4}
-    k = k_map[tok]
-    return exact_k_on(incident_cell[c], k)
+    return exact_k_on(incident_cell[c], k_map[tok])
 
-def degree_0_or_2_goal_for_vertex(p: str) -> str:
-    es = touch_vertex[p]  # size 2,3,or4 depending on boundary/interior
-    # degree 0: all off
-    deg0 = "(and " + " ".join(f"(not (On {e}))" for e in es) + ")"
-    # degree 2: choose any 2 on, rest off
-    deg2 = exact_k_on(es, 2)
-    return "(or " + deg0 + " " + deg2 + ")"
+def loop_degree_goal():
+    # degree at every vertex is 0 or 2 (NO extra nested (or (...)) wrappers)
+    parts = []
 
-goal_parts = []
+    # sanity check
+    for p in verts:
+        if len(touch_vertex[p]) < 2:
+            raise RuntimeError(f"BUG: vertex {p} has {len(touch_vertex[p])} touching edges: {touch_vertex[p]}")
 
-for c in cells:
-    if c in clues:
-        goal_parts.append(clue_goal_for_cell(c))
+    for p in verts:
+        es = touch_vertex[p]
+        deg0 = "(and " + " ".join(f"(not (On {e}))" for e in es) + ")"
+        deg2 = exact_k_on(es, 2)
+        parts.append(f"(or {deg0} {deg2})")   # <-- IMPORTANT: no extra "(or (...))"
 
-for p in verts:
-    goal_parts.append(degree_0_or_2_goal_for_vertex(p))
+    # non-empty
+    parts.append("(or " + " ".join(f"(On {e})" for e in edges) + ")")
 
-goal_parts.append("(or " + " ".join(f"(On {e})" for e in edges) + ")")
+    return "(and " + " ".join(parts) + ")"
 
-goal_str = "(and " + " ".join(goal_parts) + ")"
+
+goal_str = "(and " + " ".join([
+    clue_goal_for_cell(cell_name),   # only c00
+    loop_degree_goal(),
+]) + ")"
+
+# print("GOAL_STR_PREVIEW:\n", goal_str)
+
 goal = r(goal_str)
 
 
+# -----------------------------
+# run
+# -----------------------------
 sst = SST_Prover()
 
 plan = run_spectra(
@@ -198,10 +199,10 @@ plan = run_spectra(
     verbose=False,
 )[0]
 
-print("CLUES:", clue_inputs)
+print("\nCLUE INPUT:", clue_input)
 print("PLAN:")
 if not plan:
-    print("No plan found")
+    print("  No plan found (could be unsat with loop constraints)")
 else:
     for i, step in enumerate(plan, 1):
         print(i, step)
