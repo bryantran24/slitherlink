@@ -10,7 +10,7 @@ from shadowprover.reasoners.planner import run_spectra
 
 
 domain = {
-    r("c00"),
+    r("c00"), r("four"),
     r("h00"), r("h01"),
     r("v00"), r("v01"),
 }
@@ -22,6 +22,7 @@ background = set(
         [
             # cell
             "(Cell c00)",
+            "(Clue c00 four)",
 
             # edges
             "(Edge h00)", "(Edge h01)",
@@ -61,7 +62,20 @@ incident = {
     "c00": ["h00", "h01", "v00", "v01"]
 }
 
-goal_str = "(and " + " ".join(f"(On {e})" for e in incident["c00"]) + ")"
+clues = {
+    "c00": "four"
+}
+
+def goal_from_clue(cell):
+    clue = clues[cell]
+    edges = incident[cell]
+
+    if clue == "four":
+        return "(and " + " ".join(f"(On {e})" for e in edges) + ")"
+
+    raise ValueError("Unsupported clue")
+
+goal_str = goal_from_clue("c00")
 goal = r(goal_str)
 
 sst = SST_Prover()
@@ -78,5 +92,52 @@ result = run_spectra(
 
 print("GOAL:", goal_str)
 print("PLAN:")
-for i, step in enumerate(result, 1):
-    print(i, step)
+
+if not result:
+    print(" No plan found")
+else:
+    for i, step in enumerate(result, 1):
+        print(i, step)
+
+
+result = ["Draw h00", "Draw v00", "Draw h01", "Draw v01"]  # for testing drawing
+
+def edges_on_from_plan(plan):
+    on = set()
+    for step in plan:
+        s = str(step).strip()
+        if s.startswith("(") and s.endswith(")"):
+            s = s[1:-1]
+        parts = s.split()
+        if len(parts) == 2 and parts[0] == "Draw":
+            on.add(parts[1])
+    return on
+
+def print_1x1_slitherlink(on_edges, clue=None):
+    dot = "●"
+    h = "───"
+    v = "│"
+    space = "   "
+
+    # top row
+    top = dot
+    top += h if "h00" in on_edges else space
+    top += dot
+
+    # middle row (put clue in center if present)
+    center = f" {clue} " if clue is not None else space
+    mid = (v if "v00" in on_edges else " ") \
+          + center \
+          + (v if "v01" in on_edges else " ")
+
+    # bottom row
+    bot = dot
+    bot += h if "h01" in on_edges else space
+    bot += dot
+
+    print(top)
+    print(mid)
+    print(bot)
+
+on_edges = edges_on_from_plan(result)
+print_1x1_slitherlink(on_edges, clue="4")
