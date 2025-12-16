@@ -276,20 +276,19 @@ for i, e in enumerate(edge_order):
     # Draw this specific edge at this specific step
     actions.append(
         Action(
-            r(f"(Draw_{i} {e})"), 
+            r(f"(Draw_{i} {e})"),
             precondition=r(f"(and (Ready {s_i}) (Edge {e}) (Undrawn {e}))"),
             additions={r(f"(On {e})"), r(f"(Ready {s_n})")},
-            deletions={r(f"(Ready {s_i})"), r(f"(Undrawn {e}))"), r(f"(not (On {e}))")},
+            deletions={r(f"(Ready {s_i})"), r(f"(Undrawn {e})"), r(f"(not (On {e}))")},
         )
     )
 
-    # Skip this edge at this step (leave it Off)
     actions.append(
         Action(
             r(f"(Skip_{i} {e})"),
             precondition=r(f"(and (Ready {s_i}) (Edge {e}) (Undrawn {e}))"),
             additions={r(f"(Ready {s_n})")},
-            deletions={r(f"(Ready {s_i})"), r(f"(Undrawn {e}))")},
+            deletions={r(f"(Ready {s_i})"), r(f"(Undrawn {e})")},
         )
     )
 
