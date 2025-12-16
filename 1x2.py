@@ -10,10 +10,14 @@ from shadowprover.syntax.reader import r
 from shadowprover.experimental.sst_prover import SST_Prover
 from shadowprover.reasoners.planner import run_spectra
 
+import time
 
-H, W = 2, 2
+start_time = time.perf_counter()
 
-clue_input = [("c00", 3), ("c01", 3), ("c10", 3), ("c11", 3)]
+
+H, W = 1, 2
+
+clue_input = []
 # clue_input = [("c00", 4), ("c01", 1), ("c10", 1), ("c11", 4)]
 # clue_input = [("c00", 4)]
 
@@ -22,28 +26,36 @@ def normalize_clue_token(val) -> str:
     val = str(val).strip().lower()
     if val in {"zero", "one", "two", "three", "four"}:
         return val
-    if val == "0": return "zero"
-    if val == "1": return "one"
-    if val == "2": return "two"
-    if val == "3": return "three"
-    if val == "4": return "four"
+    if val == "0":
+        return "zero"
+    if val == "1":
+        return "one"
+    if val == "2":
+        return "two"
+    if val == "3":
+        return "three"
+    if val == "4":
+        return "four"
     raise ValueError(f"Bad clue token: {val}")
 
 
 def parse_clues(clue_pairs):
-    """
-    Input: [("c00", 3), ("c01", 2)]
-    Output: {"c00": "three", "c01": "two"}
-    """
     clues = {}
     for cell, val in clue_pairs:
         clues[cell] = normalize_clue_token(val)
     return clues
 
 
-def cell_name(r, c): return f"c{r}{c}"
-def h_name(r, c): return f"h{r}{c}"
-def v_name(r, c): return f"v{r}{c}"
+def cell_name(r, c):
+    return f"c{r}{c}"
+
+
+def h_name(r, c):
+    return f"h{r}{c}"
+
+
+def v_name(r, c):
+    return f"v{r}{c}"
 
 
 def build_grid(H, W):
@@ -62,19 +74,15 @@ def build_grid(H, W):
     for r in range(H):
         for c in range(W):
             incident[cell_name(r, c)] = [
-                h_name(r, c),        # top
-                h_name(r + 1, c),    # bottom
-                v_name(r, c),        # left
-                v_name(r, c + 1),    # right
+                h_name(r, c),  # top
+                h_name(r + 1, c),  # bottom
+                v_name(r, c),  # left
+                v_name(r, c + 1),  # right
             ]
     return cells, edges, incident
 
 
 def build_vertices(H, W):
-    """
-    Vertex (dot) names: p{r}{c} for r in [0..H], c in [0..W]
-    Each vertex touches up to 4 edges: left/right horizontals, up/down verticals.
-    """
     vertices = []
     incident_vtx = {}
 
@@ -114,9 +122,6 @@ def edges_on_from_plan(plan_steps):
 
 
 def print_slitherlink_ascii(H, W, on_edges, clues):
-    """
-    Generic HxW ASCII printer (works for 1x2, 2x2, etc.)
-    """
     dot, HBAR, VBAR, SPACE = "●", "───", "│", "   "
     clue_char = {"zero": "0", "one": "1", "two": "2", "three": "3", "four": "4"}
 
@@ -130,10 +135,10 @@ def print_slitherlink_ascii(H, W, on_edges, clues):
         # cell row r
         line = ""
         for c in range(W):
-            line += (VBAR if v_name(r, c) in on_edges else " ")
+            line += VBAR if v_name(r, c) in on_edges else " "
             cell = cell_name(r, c)
             line += f" {clue_char[clues[cell]]} " if cell in clues else SPACE
-        line += (VBAR if v_name(r, W) in on_edges else " ")
+        line += VBAR if v_name(r, W) in on_edges else " "
         print(line)
 
     # bottom boundary
@@ -143,11 +148,8 @@ def print_slitherlink_ascii(H, W, on_edges, clues):
     print(line)
 
 
-# =============================
-# NEW-ish (but same as your working 1x2): compact goal encodings
-# =============================
 def exactly_k_of_4(edges4, k: int) -> str:
-    x  = [f"(On {e})" for e in edges4]
+    x = [f"(On {e})" for e in edges4]
     nx = [f"(not (On {e}))" for e in edges4]
 
     if k == 0:
@@ -173,11 +175,11 @@ def exactly_k_of_4(edges4, k: int) -> str:
 
     if k == 2:
         clauses = []
-        triples = [(0,1,2), (0,1,3), (0,2,3), (1,2,3)]
-        for (i,j,l) in triples:
+        triples = [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)]
+        for i, j, l in triples:
             clauses.append(f"(or {nx[i]} {nx[j]} {nx[l]})")  # not all 3 true
-        for (i,j,l) in triples:
-            clauses.append(f"(or {x[i]} {x[j]} {x[l]})")      # not all 3 false
+        for i, j, l in triples:
+            clauses.append(f"(or {x[i]} {x[j]} {x[l]})")  # not all 3 false
         return "(and " + " ".join(clauses) + ")"
 
     raise ValueError("k must be 0..4")
@@ -203,14 +205,11 @@ def degree_0_or_2(edges_at_vertex):
                 parts.append(f"(On {e})" if (k == i or k == j) else f"(not (On {e}))")
             pairs.append("(and " + " ".join(parts) + ")")
 
-    # avoid unary (or X)
+    # avoid (or X)
     exactly_2 = pairs[0] if len(pairs) == 1 else "(or " + " ".join(pairs) + ")"
     return "(or " + all_off + " " + exactly_2 + ")"
 
 
-# =============================
-# Build instance
-# =============================
 cells, edges, incident = build_grid(H, W)
 vertices, vtx_incident = build_vertices(H, W)
 clues = parse_clues(clue_input)
@@ -219,33 +218,34 @@ for c in clues:
     if c not in incident:
         raise ValueError(f"Unknown cell {c}. Valid cells: {list(incident.keys())}")
 
-domain = set(map(r, cells + edges + ["zero", "one", "two", "three", "four"]))
+domain = set(map(r, edges))
 
 background = set(
-    map(
-        r,
-        (
-            [f"(Cell {c})" for c in cells]
-            + [f"(Edge {e})" for e in edges]
-            + [f"(Clue {c} {clue})" for c, clue in clues.items()]
-        ),
-    )
+    # map(
+    #     r,
+    #     (
+    #         # [f"(Cell {c})" for c in cells] +
+    #         [f"(Edge {e})" for e in edges]
+    #         # + [f"(Clue {c} {clue})" for c, clue in clues.items()]
+    #     ),
+    # )
 )
+print("Domain", domain)
+print("Background", background)
 
 actions = [
     Action(
         r("(Draw ?e)"),
-        precondition=r("(and (Edge ?e) (Undrawn ?e))"),
+        precondition=r("(not (On ?e))"),
         additions={r("(On ?e)")},
-        deletions={r("(Undrawn ?e)"), r("(not (On ?e))")},
+        deletions={r("(not (On ?e))")},
     )
 ]
 
 start = set(
     map(
         r,
-        [f"(Undrawn {e})" for e in edges]
-        + [f"(not (On {e}))" for e in edges],
+        [f"(not (On {e}))" for e in edges],
     )
 )
 
@@ -253,11 +253,11 @@ start = set(
 def goal_from_clue(cell):
     es = incident[cell]
     clue = clues[cell]
-    k_map = {"zero":0, "one":1, "two":2, "three":3, "four":4}
+    k_map = {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4}
     return exactly_k_of_4(es, k_map[clue])
 
 
-# clue goals (avoid unary and)
+# clue goals
 clue_goals = [goal_from_clue(c) for c in clues.keys()]
 if len(clue_goals) == 0:
     raise ValueError("Need at least one clue to form a goal.")
@@ -269,7 +269,7 @@ else:
 # vertex goals
 vertex_goals = [degree_0_or_2(vtx_incident[v]) for v in vertices]
 
-# non-empty loop
+# non-empty loop so at least one edge must be drawn.
 nonempty_goal = "(or " + " ".join(f"(On {e})" for e in edges) + ")"
 
 # final goal
@@ -277,10 +277,8 @@ all_goals = [clue_goal_str] + vertex_goals + [nonempty_goal]
 goal_str = all_goals[0] if len(all_goals) == 1 else "(and " + " ".join(all_goals) + ")"
 goal = r(goal_str)
 
+print("Goal", goal)
 
-# =============================
-# Solve + print
-# =============================
 sst = SST_Prover()
 
 plan = run_spectra(
@@ -305,3 +303,8 @@ else:
 
     print("\nASCII SOLUTION:")
     print_slitherlink_ascii(H, W, edges_on_from_plan(plan), clues)
+
+end_time = time.perf_counter()
+elapsed_time = end_time - start_time
+
+print(f"Elapsed time: {elapsed_time:.4f} seconds")
