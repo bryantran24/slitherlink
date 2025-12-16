@@ -1,6 +1,7 @@
 import os
 import itertools
 
+
 os.environ["EPROVER_HOME"] = "./eprover/"
 
 from shadowprover.syntax import *
@@ -11,6 +12,10 @@ from shadowprover.experimental.sst_prover import SST_Prover
 from shadowprover.reasoners.planner import run_spectra
 
 import time
+
+import inspect
+print("Action signature:", inspect.signature(Action))
+print("Action source:", Action)
 
 start_time = time.perf_counter()
 
@@ -230,11 +235,10 @@ actions = [
     Action(
         r("(Draw ?e)"),
         precondition=r("(and (Edge ?e) (not (On ?e)))"),
-        additions=[r("(On ?e)")],            # CHANGED
-        deletions=[r("(not (On ?e))")],      # CHANGED
+        additions=set([r("(On ?e)")]),
+        deletions=set([r("(not (On ?e))")]),
     )
 ]
-
 
 def goal_from_clue(cell):
     es = incident[cell]
@@ -268,8 +272,10 @@ actions.append(
     Action(
         r("(Finish)"),
         precondition=constraint_goal,
-        additions=[r("(Done)")],   # CHANGED: list instead of set
-        deletions=[],              # CHANGED: empty list instead of set()
+        additions=set([r("(Done)")]),
+        deletions=set(),
+        # add_neg=set(),
+        # del_neg=set(),
     )
 )
 goal = r("(Done)")                        # final goal
