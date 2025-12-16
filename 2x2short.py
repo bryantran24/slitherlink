@@ -218,15 +218,15 @@ for c in clues:
     if c not in incident:
         raise ValueError(f"Unknown cell {c}. Valid cells: {list(incident.keys())}")
 
-domain = set(map(r, cells + edges))
+domain = set(map(r, edges))
 
 background = set(
     map(
         r,
         (
-            [f"(Cell {c})" for c in cells]
-            + [f"(Edge {e})" for e in edges]
-            + [f"(Clue {c} {clue})" for c, clue in clues.items()]
+            # [f"(Cell {c})" for c in cells] +
+            [f"(Edge {e})" for e in edges]
+            # + [f"(Clue {c} {clue})" for c, clue in clues.items()]
         ),
     )
 )
