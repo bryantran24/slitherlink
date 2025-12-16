@@ -1,4 +1,5 @@
 import os
+
 os.environ["EPROVER_HOME"] = "./eprover/"
 
 from shadowprover.syntax import *
@@ -10,9 +11,12 @@ from shadowprover.reasoners.planner import run_spectra
 
 
 domain = {
-    r("c00"), r("four"),
-    r("h00"), r("h01"),
-    r("v00"), r("v01"),
+    r("c00"),
+    r("three"),
+    r("h00"),
+    r("h01"),
+    r("v00"),
+    r("v01"),
 }
 
 
@@ -22,17 +26,17 @@ background = set(
         [
             # cell
             "(Cell c00)",
-            "(Clue c00 four)",
-
+            "(Clue c00 three)",
             # edges
-            "(Edge h00)", "(Edge h01)",
-            "(Edge v00)", "(Edge v01)",
-
+            "(Edge h00)",
+            "(Edge h01)",
+            "(Edge v00)",
+            "(Edge v01)",
             # incidence (exactly 4 edges around the cell)
-            "(Incident h00 c00)",   # top
-            "(Incident h01 c00)",   # bottom
-            "(Incident v00 c00)",   # left
-            "(Incident v01 c00)",   # right
+            "(Incident h00 c00)",  # top
+            "(Incident h01 c00)",  # bottom
+            "(Incident v00 c00)",  # left
+            "(Incident v01 c00)",  # right
         ],
     )
 )
@@ -42,7 +46,7 @@ actions = [
         r("(Draw ?e)"),
         precondition=r("(and (Edge ?e) (Undrawn ?e))"),
         additions={r("(On ?e)")},
-        deletions={r("(Undrawn ?e)")},
+        deletions={r("(Undrawn ?e)"), r("(not (On ?e))")},
     )
 ]
 
@@ -54,17 +58,18 @@ start = set(
             "(Undrawn h01)",
             "(Undrawn v00)",
             "(Undrawn v01)",
+            "(not (On h00))",
+            "(not (On h01))",
+            "(not (On v00))",
+            "(not (On v01))",
         ],
     )
 )
 
-incident = {
-    "c00": ["h00", "h01", "v00", "v01"]
-}
+incident = {"c00": ["h00", "h01", "v00", "v01"]}
 
-clues = {
-    "c00": "four"
-}
+clues = {"c00": "three"}
+
 
 def goal_from_clue(cell):
     clue = clues[cell]
@@ -73,7 +78,20 @@ def goal_from_clue(cell):
     if clue == "four":
         return "(and " + " ".join(f"(On {e})" for e in edges) + ")"
 
+    if clue == "three":
+        # exactly 3 On == choose 1 edge to be NOT On, the other 3 are On
+        cases = []
+        for off in edges:
+            on_edges = [e for e in edges if e != off]
+            case = (
+                "(and "
+                + " ".join([f"(On {e})" for e in on_edges] + [f"(not (On {off}))"])
+                + ")"
+            )
+            cases.append(case)
+        return "(or " + " ".join(cases) + ")"
     raise ValueError("Unsupported clue")
+
 
 goal_str = goal_from_clue("c00")
 goal = r(goal_str)
@@ -102,6 +120,7 @@ else:
 
 result = ["Draw h00", "Draw v00", "Draw h01", "Draw v01"]  # for testing drawing
 
+
 def edges_on_from_plan(plan):
     on = set()
     for step in plan:
@@ -112,6 +131,7 @@ def edges_on_from_plan(plan):
         if len(parts) == 2 and parts[0] == "Draw":
             on.add(parts[1])
     return on
+
 
 def print_1x1_slitherlink(on_edges, clue=None):
     dot = "●"
@@ -126,9 +146,7 @@ def print_1x1_slitherlink(on_edges, clue=None):
 
     # middle row (put clue in center if present)
     center = f" {clue} " if clue is not None else space
-    mid = (v if "v00" in on_edges else " ") \
-          + center \
-          + (v if "v01" in on_edges else " ")
+    mid = (v if "v00" in on_edges else " ") + center + (v if "v01" in on_edges else " ")
 
     # bottom row
     bot = dot
@@ -139,5 +157,7 @@ def print_1x1_slitherlink(on_edges, clue=None):
     print(mid)
     print(bot)
 
+
 on_edges = edges_on_from_plan(result)
 print_1x1_slitherlink(on_edges, clue="4")
+

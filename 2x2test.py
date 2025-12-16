@@ -41,7 +41,7 @@ def c(idx):
 domain = set(map(r, [c(i) for i in range(grid_size + 1)]))
 background_axioms = []
 
-# --- A. Cell Count Constraints ---
+# Set goals based on puzzle number constraints
 for (r_idx, c_idx), count in puzzle_input.items():
     # Edges: Top, Bottom, Left, Right
     edges = [
