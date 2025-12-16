@@ -159,10 +159,12 @@ def edges_on_from_plan(plan_steps):
 
 def print_1x1_ascii(on_edges, clue=None):
     dot, h, v, space = "●", "───", "│", "   "
+
     top = dot + (h if "h00" in on_edges else space) + dot
     midc = f" {clue} " if clue is not None else space
     mid = (v if "v00" in on_edges else " ") + midc + (v if "v01" in on_edges else " ")
-    bot = dot + (h if "h01" in on_edges else space) + dot
+    bot = dot + (h if "h10" in on_edges else space) + dot  # FIXED: h10 not h01
+
     print(top)
     print(mid)
     print(bot)
