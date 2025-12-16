@@ -102,35 +102,20 @@ background = set(map(r, bg))
 
 
 # -----------------------------
-# actions + start
+# start
 # -----------------------------
-actions = [
-    Action(
-        r("(Draw ?e)"),
-        precondition=r("(and (Edge ?e) (Undrawn ?e))"),
-        additions={r("(On ?e)")},
-        deletions={r("(Undrawn ?e)"), r("(not (On ?e))")},
-    )
-]
-
 start = set(map(r,
     [f"(Undrawn {e})" for e in edges] +
     [f"(not (On {e}))" for e in edges]
 ))
 
-
 # -----------------------------
-# goal compilation (FIXED)
+# helpers to build constraints
 # -----------------------------
-def contradiction():
-    # safe always-false using an existing constant
-    return "(and (On h00) (not (On h00)))"
-
 def exact_k_on(es, k):
-    # exact-k over es using explicit negations
     n = len(es)
     if k < 0 or k > n:
-        return contradiction()
+        return "(and (On h00) (not (On h00)))"  # false
 
     if k == 0:
         return "(and " + " ".join(f"(not (On {e}))" for e in es) + ")"
@@ -142,51 +127,54 @@ def exact_k_on(es, k):
         on_set = set(on_tuple)
         parts = [(f"(On {e})" if e in on_set else f"(not (On {e}))") for e in es]
         cases.append("(and " + " ".join(parts) + ")")
-
-    if not cases:
-        return contradiction()
-
     return "(or " + " ".join(cases) + ")"
 
-def clue_goal_for_cell(c):
-    tok = clues[c]
-    k_map = {"zero":0,"one":1,"two":2,"three":3,"four":4}
-    return exact_k_on(incident_cell[c], k_map[tok])
+def degree_leq_2_formula(es):
+    """
+    Fast invariant: forbid degree 3 or 4.
+    For a vertex with edges es, degree>2 means: there exist 3 distinct edges all On.
+    We compile: NOT( OR over all triples (and On e1 On e2 On e3) )
+    """
+    triples = list(itertools.combinations(es, 3))
+    if not triples:
+        return "(or (On h00) (not (On h00)))"  # true
 
-def loop_degree_goal():
-    # degree at every vertex is 0 or 2 (NO extra nested (or (...)) wrappers)
-    parts = []
+    bad = []
+    for (a,b,c) in triples:
+        bad.append(f"(and (On {a}) (On {b}) (On {c}))")
+    return "(not (or " + " ".join(bad) + "))"
 
-    # sanity check
-    for p in verts:
-        if len(touch_vertex[p]) < 2:
-            raise RuntimeError(f"BUG: vertex {p} has {len(touch_vertex[p])} touching edges: {touch_vertex[p]}")
+# -----------------------------
+# Build postconditions (invariants) for Draw
+# -----------------------------
+vertex_invariants = []
+for p in verts:
+    es = touch_vertex[p]
+    vertex_invariants.append(degree_leq_2_formula(es))
 
-    for p in verts:
-        es = touch_vertex[p]
-        deg0 = "(and " + " ".join(f"(not (On {e}))" for e in es) + ")"
-        deg2 = exact_k_on(es, 2)
-        parts.append(f"(or {deg0} {deg2})")   # <-- IMPORTANT: no extra "(or (...))"
+# OPTIONAL (stronger but can prune too hard early):
+# forbid degree 1 at end only, not during search.
+# We'll keep ONLY <=2 as invariant.
 
-    # non-empty
-    parts.append("(or " + " ".join(f"(On {e})" for e in edges) + ")")
+postconds = { r(f) for f in vertex_invariants }
 
-    return "(and " + " ".join(parts) + ")"
+actions = [
+    Action(
+        r("(Draw ?e)"),
+        precondition=r("(and (Edge ?e) (Undrawn ?e))"),
+        additions={r("(On ?e)")},
+        deletions={r("(Undrawn ?e)"), r("(not (On ?e))")},
+        postconditions=postconds,  # <-- huge speedup vs putting it in the goal
+    )
+]
 
-
-goal_str = "(and " + " ".join([
-    clue_goal_for_cell(cell_name),   # only c00
-    loop_degree_goal(),
-]) + ")"
-
-# print("GOAL_STR_PREVIEW:\n", goal_str)
-
+# -----------------------------
+# Goal: ONLY the clue constraint (small)
+# -----------------------------
+k_map = {"zero":0,"one":1,"two":2,"three":3,"four":4}
+goal_str = exact_k_on(incident_cell[cell_name], k_map[clue_tok])
 goal = r(goal_str)
 
-
-# -----------------------------
-# run
-# -----------------------------
 sst = SST_Prover()
 
 plan = run_spectra(
@@ -199,10 +187,11 @@ plan = run_spectra(
     verbose=False,
 )[0]
 
-print("\nCLUE INPUT:", clue_input)
+print("CLUE INPUT:", clue_input)
+print("GOAL:", goal_str)
 print("PLAN:")
 if not plan:
-    print("  No plan found (could be unsat with loop constraints)")
+    print("  No plan found")
 else:
     for i, step in enumerate(plan, 1):
         print(i, step)
