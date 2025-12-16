@@ -17,7 +17,7 @@ start_time = time.perf_counter()
 
 H, W = 1, 2
 
-clue_input = [("c00", 3), ("c01", 3)]
+clue_input = []
 # clue_input = [("c00", 4), ("c01", 1), ("c10", 1), ("c11", 4)]
 # clue_input = [("c00", 4)]
 
@@ -221,14 +221,14 @@ for c in clues:
 domain = set(map(r, edges))
 
 background = set(
-    map(
-        r,
-        (
-            # [f"(Cell {c})" for c in cells] +
-            [f"(Edge {e})" for e in edges]
-            # + [f"(Clue {c} {clue})" for c, clue in clues.items()]
-        ),
-    )
+    # map(
+    #     r,
+    #     (
+    #         # [f"(Cell {c})" for c in cells] +
+    #         [f"(Edge {e})" for e in edges]
+    #         # + [f"(Clue {c} {clue})" for c, clue in clues.items()]
+    #     ),
+    # )
 )
 print("Domain", domain)
 print("Background", background)
@@ -236,7 +236,7 @@ print("Background", background)
 actions = [
     Action(
         r("(Draw ?e)"),
-        precondition=r("(Edge ?e)"),
+        precondition=r("(not (On ?e))"),
         additions={r("(On ?e)")},
         deletions={r("(not (On ?e))")},
     )
@@ -260,7 +260,7 @@ def goal_from_clue(cell):
 # clue goals
 clue_goals = [goal_from_clue(c) for c in clues.keys()]
 if len(clue_goals) == 0:
-    raise ValueError("Need at least one clue to form a goal.")
+    clue_goal_str = "(and)"  # no clue constraints
 elif len(clue_goals) == 1:
     clue_goal_str = clue_goals[0]
 else:
@@ -278,22 +278,6 @@ goal_str = all_goals[0] if len(all_goals) == 1 else "(and " + " ".join(all_goals
 goal = r(goal_str)
 
 print("Goal", goal)
-
-constraint_goal = goal  # keep the real constraints
-
-start.add(r("(Alive)"))
-
-actions.append(
-    Action(
-        r("(Finish)"),
-        precondition=constraint_goal,
-        additions={r("(Done)")},
-        deletions={r("(Alive)")},
-    )
-)
-
-goal = r("(Done)")  # planner now stops as soon as constraints are satisfied
-# --- END ADD ---
 
 sst = SST_Prover()
 
