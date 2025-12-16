@@ -109,16 +109,13 @@ def build_vertices(H, W):
     return vertices, incident_vtx
 
 def edges_on_from_plan(plan_steps):
-    """
-    CHANGED: recognizes Draw_i actions (from ordered Draw/Skip)
-    """
     on = set()
     for step in plan_steps:
         s = str(step).strip()
         if s.startswith("(") and s.endswith(")"):
             s = s[1:-1]
         name, edge = s.split()
-        if name.startswith("Draw_"):  # CHANGED
+        if name == "Draw":
             on.add(edge)
     return on
 
@@ -220,49 +217,23 @@ for c in clues:
     if c not in incident:
         raise ValueError(f"Unknown cell {c}. Valid cells: {list(incident.keys())}")
     
-# -------------------------
-# CHANGED: ordered Draw/Skip requires step constants s0..sE in the domain
-# -------------------------
-edge_order = sorted(edges)               # CHANGED (fixed decision order)
-E = len(edge_order)                      # CHANGED
-def step_name(i): return f"s{i}"         # CHANGED
+domain = set(map(r, edges))
 
-domain = set(map(r, edges + [step_name(i) for i in range(E + 1)]))  # CHANGED
-
-
-background = set()
+background = set(map(r, [f"(Edge {e})" for e in edges]))
 
 start = set(map(r, [f"(not (On {e}))" for e in edges]))
-start.add(r(f"(Ready {step_name(0)})"))  # CHANGED
 
 print("Domain", domain)
 print("Background", background)
 
-actions = []
-for i, e in enumerate(edge_order):
-    s_i = step_name(i)
-    s_n = step_name(i + 1)
-
-    # Decide "On" for this edge
-    actions.append(
-        Action(
-            r(f"(Draw_{i} {e})"),
-            precondition=r(f"(and (Ready {s_i}) (not (On {e})))"),
-            additions={r(f"(On {e})"), r(f"(Ready {s_n})")},
-            deletions={r(f"(Ready {s_i})"), r(f"(not (On {e}))")},
-        )
+actions = [
+    Action(
+        r("(Draw ?e)"),
+        precondition=r("(and (Edge ?e) (not (On ?e)))"),
+        additions={r("(On ?e)")},
+        deletions={r("(not (On ?e)))")},
     )
-
-    # Decide "Off" (skip) for this edge
-    actions.append(
-        Action(
-            r(f"(Skip_{i} {e})"),
-            precondition=r(f"(and (Ready {s_i}) (not (On {e})))"),
-            additions={r(f"(Ready {s_n})")},
-            deletions={r(f"(Ready {s_i})")},
-        )
-    )
-
+]
 
 def goal_from_clue(cell):
     es = incident[cell]
@@ -286,15 +257,21 @@ vertex_goals = [degree_0_or_2(vtx_incident[v]) for v in vertices]
 # non-empty loop so at least one edge must be drawn.
 nonempty_goal = "(or " + " ".join(f"(On {e})" for e in edges) + ")"
 
-# -------------------------
-# CHANGED: require reaching final step so every edge is decided (Draw or Skip)
-# -------------------------
-processed_goal = f"(Ready {step_name(E)})"  # CHANGED
 
 # final goal
-all_goals = [clue_goal_str] + vertex_goals + [nonempty_goal, processed_goal]  # CHANGED
+all_goals = [clue_goal_str] + vertex_goals + [nonempty_goal]
 goal_str = all_goals[0] if len(all_goals) == 1 else "(and " + " ".join(all_goals) + ")"
-goal = r(goal_str)
+constraint_goal = r(goal_str)  # CHANGED: keep the real constraints separately
+
+actions.append(
+    Action(
+        r("(Finish)"),
+        precondition=constraint_goal,     # CHANGED
+        additions={r("(Done)")},
+        deletions=set(),
+    )
+)
+goal = r("(Done)")                        # final goal
 
 sst = SST_Prover()
 

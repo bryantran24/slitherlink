@@ -1,5 +1,5 @@
 import os
-os.environ['../EPROVER_HOME'] = './eprover/'
+os.environ['EPROVER_HOME'] = './../eprover/'
 from shadowprover.syntax import *
 from shadowprover.reasoners.planner import Action
 from shadowprover.syntax.reader import r
