@@ -230,7 +230,7 @@ def step_name(i): return f"s{i}"         # CHANGED
 domain = set(map(r, edges + [step_name(i) for i in range(E + 1)]))  # CHANGED
 
 
-background = set(map(r, [f"(Edge {e})" for e in edges] + [f"(Step {step_name(i)})" for i in range(E + 1)]))  # CHANGED
+background = set()
 
 start = set(map(r, [f"(not (On {e}))" for e in edges]))
 start.add(r(f"(Ready {step_name(0)})"))  # CHANGED
@@ -247,7 +247,7 @@ for i, e in enumerate(edge_order):
     actions.append(
         Action(
             r(f"(Draw_{i} {e})"),
-            precondition=r(f"(and (Ready {s_i}) (Edge {e}) (not (On {e})))"),
+            precondition=r(f"(and (Ready {s_i}) (not (On {e})))"),
             additions={r(f"(On {e})"), r(f"(Ready {s_n})")},
             deletions={r(f"(Ready {s_i})"), r(f"(not (On {e}))")},
         )
@@ -257,7 +257,7 @@ for i, e in enumerate(edge_order):
     actions.append(
         Action(
             r(f"(Skip_{i} {e})"),
-            precondition=r(f"(and (Ready {s_i}) (Edge {e}) (not (On {e})))"),
+            precondition=r(f"(and (Ready {s_i}) (not (On {e})))"),
             additions={r(f"(Ready {s_n})")},
             deletions={r(f"(Ready {s_i})")},
         )
