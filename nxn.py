@@ -21,28 +21,14 @@ from shadowprover.experimental.sst_prover import SST_Prover
 from shadowprover.reasoners.planner import run_spectra
 from shadowprover.fol.fol_prover import fol_prove
 
+import time
+
+start_time = time.perf_counter()
 # ==========================================
 # 3. Puzzle Setup (1x1 with '4')
 # ==========================================
 puzzle_input = {(0, 0): 4}
 grid_size = 1
-
-
-def normalize_clue_token(val) -> str:
-    val = str(val).strip().lower()
-    if val in {"zero", "one", "two", "three", "four"}:
-        return val
-    if val == "0":
-        return "zero"
-    if val == "1":
-        return "one"
-    if val == "2":
-        return "two"
-    if val == "3":
-        return "three"
-    if val == "4":
-        return "four"
-    raise ValueError(f"Bad clue token: {val}")
 
 
 def h(r, c):
@@ -143,37 +129,32 @@ actions = [
 ]
 
 
-# Manual Caching Wrapper (Exactly as in 1x2.py)
-def get_cached_prover(find_answer=True, max_answers=5):
-    @cache
-    def cached_prover(inputs, output, find_answer=find_answer, max_answers=max_answers):
-        return fol_prove(
-            inputs, output, find_answer=find_answer, max_answers=max_answers
-        )
-
-    def _prover_(inputs, output, find_answer=find_answer, max_answers=max_answers):
-        return cached_prover(
-            frozenset(inputs), output, find_answer, max_answers=max_answers
-        )
-
-    return _prover_
-
-
 print("Running Spectra (Monolithic + Manual Prover)...")
 
 sst = SST_Prover()
 # Completions=[] because we handle negations manually in Start State
-result = run_spectra(
+background = set("stuff")
+print("Domain", domain)
+print("Background", background)
+print("Start", start)
+print("Goal", goal)
+print("Actions", actions)
+plan = run_spectra(
     domain,
-    set(),
+    background,
     start,
     goal,
     actions,
     sst.get_cached_shadow_prover2(),
-    completions=[],
     verbose=False,
-)
-plan = result
+)[0]
+
+print("Solved")
+
+end_time = time.perf_counter()
+elapsed_time = end_time - start_time
+
+print(f"Elapsed time: {elapsed_time:.4f} seconds")
 
 if plan:
     print(f"\nPLAN FOUND! ({len(plan)} steps)")

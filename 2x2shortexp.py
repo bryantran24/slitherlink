@@ -17,7 +17,7 @@ start_time = time.perf_counter()
 
 H, W = 1, 2
 
-clue_input = []
+clue_input = [("c00", 3), ("c01", 3)]
 # clue_input = [("c00", 4), ("c01", 1), ("c10", 1), ("c11", 4)]
 # clue_input = [("c00", 4)]
 
