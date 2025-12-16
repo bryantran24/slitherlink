@@ -236,16 +236,16 @@ print("Background", background)
 actions = [
     Action(
         r("(Draw ?e)"),
-        precondition=r("(and (Edge ?e) (Undrawn ?e))"),
+        precondition=r("(Edge ?e)"),
         additions={r("(On ?e)")},
-        deletions={r("(Undrawn ?e)"), r("(not (On ?e))")},
+        deletions={r("(not (On ?e))")},
     )
 ]
 
 start = set(
     map(
         r,
-        [f"(Undrawn {e})" for e in edges] + [f"(not (On {e}))" for e in edges],
+        [f"(not (On {e}))" for e in edges],
     )
 )
 
@@ -308,4 +308,3 @@ end_time = time.perf_counter()
 elapsed_time = end_time - start_time
 
 print(f"Elapsed time: {elapsed_time:.4f} seconds")
-

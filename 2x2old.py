@@ -15,9 +15,9 @@ import time
 start_time = time.perf_counter()
 
 
-H, W = 2, 2
+H, W = 1, 2
 
-clue_input = [("c00", 3), ("c01", 3), ("c10", 3), ("c11", 3)]
+clue_input = [("c00", 3), ("c01", 3)]
 # clue_input = [("c00", 4), ("c01", 1), ("c10", 1), ("c11", 4)]
 # clue_input = [("c00", 4)]
 
@@ -26,11 +26,16 @@ def normalize_clue_token(val) -> str:
     val = str(val).strip().lower()
     if val in {"zero", "one", "two", "three", "four"}:
         return val
-    if val == "0": return "zero"
-    if val == "1": return "one"
-    if val == "2": return "two"
-    if val == "3": return "three"
-    if val == "4": return "four"
+    if val == "0":
+        return "zero"
+    if val == "1":
+        return "one"
+    if val == "2":
+        return "two"
+    if val == "3":
+        return "three"
+    if val == "4":
+        return "four"
     raise ValueError(f"Bad clue token: {val}")
 
 
@@ -41,9 +46,16 @@ def parse_clues(clue_pairs):
     return clues
 
 
-def cell_name(r, c): return f"c{r}{c}"
-def h_name(r, c): return f"h{r}{c}"
-def v_name(r, c): return f"v{r}{c}"
+def cell_name(r, c):
+    return f"c{r}{c}"
+
+
+def h_name(r, c):
+    return f"h{r}{c}"
+
+
+def v_name(r, c):
+    return f"v{r}{c}"
 
 
 def build_grid(H, W):
@@ -62,16 +74,15 @@ def build_grid(H, W):
     for r in range(H):
         for c in range(W):
             incident[cell_name(r, c)] = [
-                h_name(r, c),        # top
-                h_name(r + 1, c),    # bottom
-                v_name(r, c),        # left
-                v_name(r, c + 1),    # right
+                h_name(r, c),  # top
+                h_name(r + 1, c),  # bottom
+                v_name(r, c),  # left
+                v_name(r, c + 1),  # right
             ]
     return cells, edges, incident
 
 
 def build_vertices(H, W):
-
     vertices = []
     incident_vtx = {}
 
@@ -111,7 +122,6 @@ def edges_on_from_plan(plan_steps):
 
 
 def print_slitherlink_ascii(H, W, on_edges, clues):
-    
     dot, HBAR, VBAR, SPACE = "●", "───", "│", "   "
     clue_char = {"zero": "0", "one": "1", "two": "2", "three": "3", "four": "4"}
 
@@ -125,10 +135,10 @@ def print_slitherlink_ascii(H, W, on_edges, clues):
         # cell row r
         line = ""
         for c in range(W):
-            line += (VBAR if v_name(r, c) in on_edges else " ")
+            line += VBAR if v_name(r, c) in on_edges else " "
             cell = cell_name(r, c)
             line += f" {clue_char[clues[cell]]} " if cell in clues else SPACE
-        line += (VBAR if v_name(r, W) in on_edges else " ")
+        line += VBAR if v_name(r, W) in on_edges else " "
         print(line)
 
     # bottom boundary
@@ -139,7 +149,7 @@ def print_slitherlink_ascii(H, W, on_edges, clues):
 
 
 def exactly_k_of_4(edges4, k: int) -> str:
-    x  = [f"(On {e})" for e in edges4]
+    x = [f"(On {e})" for e in edges4]
     nx = [f"(not (On {e}))" for e in edges4]
 
     if k == 0:
@@ -165,11 +175,11 @@ def exactly_k_of_4(edges4, k: int) -> str:
 
     if k == 2:
         clauses = []
-        triples = [(0,1,2), (0,1,3), (0,2,3), (1,2,3)]
-        for (i,j,l) in triples:
+        triples = [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)]
+        for i, j, l in triples:
             clauses.append(f"(or {nx[i]} {nx[j]} {nx[l]})")  # not all 3 true
-        for (i,j,l) in triples:
-            clauses.append(f"(or {x[i]} {x[j]} {x[l]})")      # not all 3 false
+        for i, j, l in triples:
+            clauses.append(f"(or {x[i]} {x[j]} {x[l]})")  # not all 3 false
         return "(and " + " ".join(clauses) + ")"
 
     raise ValueError("k must be 0..4")
@@ -208,7 +218,9 @@ for c in clues:
     if c not in incident:
         raise ValueError(f"Unknown cell {c}. Valid cells: {list(incident.keys())}")
 
-domain = set(map(r, cells + edges + ["zero", "one", "two", "three", "four"]))
+domain = set(map(r, cells + edges))
+
+print(domain)
 
 background = set(
     map(
@@ -239,15 +251,15 @@ actions = [
 start = set(
     map(
         r,
-        [f"(Unassigned {e})" for e in edges]
-        + [f"(not (On {e}))" for e in edges],
+        [f"(Unassigned {e})" for e in edges] + [f"(not (On {e}))" for e in edges],
     )
 )
+
 
 def goal_from_clue(cell):
     es = incident[cell]
     clue = clues[cell]
-    k_map = {"zero":0, "one":1, "two":2, "three":3, "four":4}
+    k_map = {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4}
     return exactly_k_of_4(es, k_map[clue])
 
 
@@ -303,3 +315,4 @@ end_time = time.perf_counter()
 elapsed_time = end_time - start_time
 
 print(f"Elapsed time: {elapsed_time:.4f} seconds")
+

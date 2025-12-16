@@ -15,9 +15,9 @@ from shadowprover.reasoners.planner import run_spectra
 
 start_time = time.perf_counter()
 
-H, W = 2, 2
+H, W = 1, 2
 
-clue_input = [("c00", 3), ("c01", 3), ("c10", 3), ("c11", 3)]
+clue_input = [("c00", 3), ("c01", 3)]
 # clue_input = [("c00", 4), ("c01", 1), ("c10", 1), ("c11", 4)]
 # clue_input = [("c00", 4)]
 
@@ -140,10 +140,10 @@ def print_slitherlink_ascii(H, W, on_edges, clues):
         # cell row r
         line = ""
         for c in range(W):
-            line += (VBAR if v_name(r, c) in on_edges else " ")
+            line += VBAR if v_name(r, c) in on_edges else " "
             cell = cell_name(r, c)
             line += f" {clue_char[clues[cell]]} " if cell in clues else SPACE
-        line += (VBAR if v_name(r, W) in on_edges else " ")
+        line += VBAR if v_name(r, W) in on_edges else " "
         print(line)
 
     # bottom boundary
@@ -181,9 +181,9 @@ def exactly_k_of_4(edges4, k: int) -> str:
     if k == 2:
         clauses = []
         triples = [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)]
-        for (i, j, l) in triples:
+        for i, j, l in triples:
             clauses.append(f"(or {nx[i]} {nx[j]} {nx[l]})")  # not all 3 true
-        for (i, j, l) in triples:
+        for i, j, l in triples:
             clauses.append(f"(or {x[i]} {x[j]} {x[l]})")  # not all 3 false
         return "(and " + " ".join(clauses) + ")"
 

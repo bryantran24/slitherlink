@@ -28,6 +28,23 @@ puzzle_input = {(0, 0): 4}
 grid_size = 1
 
 
+def normalize_clue_token(val) -> str:
+    val = str(val).strip().lower()
+    if val in {"zero", "one", "two", "three", "four"}:
+        return val
+    if val == "0":
+        return "zero"
+    if val == "1":
+        return "one"
+    if val == "2":
+        return "two"
+    if val == "3":
+        return "three"
+    if val == "4":
+        return "four"
+    raise ValueError(f"Bad clue token: {val}")
+
+
 def h(r, c):
     return f"h{r}{c}"
 
@@ -144,6 +161,7 @@ def get_cached_prover(find_answer=True, max_answers=5):
 
 print("Running Spectra (Monolithic + Manual Prover)...")
 
+sst = SST_Prover()
 # Completions=[] because we handle negations manually in Start State
 result = run_spectra(
     domain,
@@ -151,15 +169,11 @@ result = run_spectra(
     start,
     goal,
     actions,
-    get_cached_prover(),
+    sst.get_cached_shadow_prover2(),
     completions=[],
     verbose=False,
 )
-
-if result is None:
-    plan = result
-else:
-    plan = False
+plan = result
 
 if plan:
     print(f"\nPLAN FOUND! ({len(plan)} steps)")
