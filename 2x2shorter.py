@@ -1,7 +1,6 @@
 import os
 import itertools
 
-
 os.environ["EPROVER_HOME"] = "./eprover/"
 
 from shadowprover.syntax import *
@@ -12,10 +11,6 @@ from shadowprover.experimental.sst_prover import SST_Prover
 from shadowprover.reasoners.planner import run_spectra
 
 import time
-
-import inspect
-print("Action signature:", inspect.signature(Action))
-print("Action source:", Action)
 
 start_time = time.perf_counter()
 
@@ -112,6 +107,7 @@ def build_vertices(H, W):
             incident_vtx[p] = inc
 
     return vertices, incident_vtx
+
 
 def edges_on_from_plan(plan_steps):
     on = set()
@@ -221,24 +217,38 @@ clues = parse_clues(clue_input)
 for c in clues:
     if c not in incident:
         raise ValueError(f"Unknown cell {c}. Valid cells: {list(incident.keys())}")
-    
+
 domain = set(map(r, edges))
 
-background = set(map(r, [f"(Edge {e})" for e in edges]))
-
-start = set(map(r, [f"(not (On {e}))" for e in edges]))
-
+background = set(
+    map(
+        r,
+        (
+            # [f"(Cell {c})" for c in cells] +
+            [f"(Edge {e})" for e in edges]
+            # + [f"(Clue {c} {clue})" for c, clue in clues.items()]
+        ),
+    )
+)
 print("Domain", domain)
 print("Background", background)
 
 actions = [
     Action(
         r("(Draw ?e)"),
-        precondition=r("(and (Edge ?e) (not (On ?e)))"),
-        additions=set([r("(On ?e)")]),
-        deletions=set([r("(not (On ?e))")]),
+        precondition=r("(Edge ?e)"),
+        additions={r("(On ?e)")},
+        deletions={r("(not (On ?e))")},
     )
 ]
+
+start = set(
+    map(
+        r,
+        [f"(not (On {e}))" for e in edges],
+    )
+)
+
 
 def goal_from_clue(cell):
     es = incident[cell]
@@ -262,23 +272,26 @@ vertex_goals = [degree_0_or_2(vtx_incident[v]) for v in vertices]
 # non-empty loop so at least one edge must be drawn.
 nonempty_goal = "(or " + " ".join(f"(On {e})" for e in edges) + ")"
 
-
 # final goal
 all_goals = [clue_goal_str] + vertex_goals + [nonempty_goal]
 goal_str = all_goals[0] if len(all_goals) == 1 else "(and " + " ".join(all_goals) + ")"
-constraint_goal = r(goal_str)  # CHANGED: keep the real constraints separately
+goal = r(goal_str)
+
+print("Goal", goal)
+
+constraint_goal = goal  # keep the real constraints
 
 actions.append(
     Action(
         r("(Finish)"),
         precondition=constraint_goal,
-        additions=set([r("(Done)")]),
+        additions={r("(Done)")},
         deletions=set(),
-        # add_neg=set(),
-        # del_neg=set(),
     )
 )
-goal = r("(Done)")                        # final goal
+
+goal = r("(Done)")  # planner now stops as soon as constraints are satisfied
+# --- END ADD ---
 
 sst = SST_Prover()
 
