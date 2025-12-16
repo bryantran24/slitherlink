@@ -10,10 +10,12 @@ from shadowprover.syntax.reader import r
 from shadowprover.experimental.sst_prover import SST_Prover
 from shadowprover.reasoners.planner import run_spectra
 
-H, W = 1, 2
 
-# clue_input = [("c00", 3), ("c01", 3)]
-clue_input = [("c00", 4)]
+H, W = 2, 2
+
+clue_input = [("c00", 3), ("c01", 3), ("c10", 3), ("c11", 3)]
+# clue_input = [("c00", 4), ("c01", 1), ("c10", 1), ("c11", 4)]
+# clue_input = [("c00", 4)]
 
 
 def normalize_clue_token(val) -> str:
@@ -45,23 +47,34 @@ def v_name(r, c): return f"v{r}{c}"
 
 
 def build_grid(H, W):
+    # cells
     cells = [cell_name(r, c) for r in range(H) for c in range(W)]
+
+    # edges
+    # horizontal: r in [0..H], c in [0..W-1]
     hedges = [h_name(r, c) for r in range(H + 1) for c in range(W)]
+    # vertical:   r in [0..H-1], c in [0..W]
     vedges = [v_name(r, c) for r in range(H) for c in range(W + 1)]
     edges = hedges + vedges
 
+    # cell -> its 4 incident edges
     incident = {}
     for r in range(H):
         for c in range(W):
             incident[cell_name(r, c)] = [
-                h_name(r, c),
-                h_name(r + 1, c),
-                v_name(r, c),
-                v_name(r, c + 1),
+                h_name(r, c),        # top
+                h_name(r + 1, c),    # bottom
+                v_name(r, c),        # left
+                v_name(r, c + 1),    # right
             ]
     return cells, edges, incident
 
+
 def build_vertices(H, W):
+    """
+    Vertex (dot) names: p{r}{c} for r in [0..H], c in [0..W]
+    Each vertex touches up to 4 edges: left/right horizontals, up/down verticals.
+    """
     vertices = []
     incident_vtx = {}
 
@@ -71,21 +84,22 @@ def build_vertices(H, W):
             vertices.append(p)
 
             inc = []
-            # horizontal edges meeting at (r,c): left and right along row r
+            # horizontals at this vertex
             if c > 0:
-                inc.append(h_name(r, c - 1))   # h{r}{c-1}
+                inc.append(h_name(r, c - 1))
             if c < W:
-                inc.append(h_name(r, c))       # h{r}{c}
+                inc.append(h_name(r, c))
 
-            # vertical edges meeting at (r,c): up and down along col c
+            # verticals at this vertex
             if r > 0:
-                inc.append(v_name(r - 1, c))   # v{r-1}{c}
+                inc.append(v_name(r - 1, c))
             if r < H:
-                inc.append(v_name(r, c))       # v{r}{c}
+                inc.append(v_name(r, c))
 
             incident_vtx[p] = inc
 
     return vertices, incident_vtx
+
 
 def edges_on_from_plan(plan_steps):
     on = set()
@@ -100,17 +114,20 @@ def edges_on_from_plan(plan_steps):
 
 
 def print_slitherlink_ascii(H, W, on_edges, clues):
+    """
+    Generic HxW ASCII printer (works for 1x2, 2x2, etc.)
+    """
     dot, HBAR, VBAR, SPACE = "●", "───", "│", "   "
     clue_char = {"zero": "0", "one": "1", "two": "2", "three": "3", "four": "4"}
 
     for r in range(H):
-        # top boundary
+        # top boundary of row r
         line = dot
         for c in range(W):
             line += (HBAR if h_name(r, c) in on_edges else SPACE) + dot
         print(line)
 
-        # middle
+        # cell row r
         line = ""
         for c in range(W):
             line += (VBAR if v_name(r, c) in on_edges else " ")
@@ -126,13 +143,81 @@ def print_slitherlink_ascii(H, W, on_edges, clues):
     print(line)
 
 
+# =============================
+# NEW-ish (but same as your working 1x2): compact goal encodings
+# =============================
+def exactly_k_of_4(edges4, k: int) -> str:
+    x  = [f"(On {e})" for e in edges4]
+    nx = [f"(not (On {e}))" for e in edges4]
+
+    if k == 0:
+        return "(and " + " ".join(nx) + ")"
+    if k == 4:
+        return "(and " + " ".join(x) + ")"
+
+    if k == 3:
+        clauses = []
+        clauses.append("(or " + " ".join(nx) + ")")  # at least one false
+        for i in range(4):
+            for j in range(i + 1, 4):
+                clauses.append(f"(or {x[i]} {x[j]})")  # at most one false
+        return "(and " + " ".join(clauses) + ")"
+
+    if k == 1:
+        clauses = []
+        clauses.append("(or " + " ".join(x) + ")")  # at least one true
+        for i in range(4):
+            for j in range(i + 1, 4):
+                clauses.append(f"(or {nx[i]} {nx[j]})")  # at most one true
+        return "(and " + " ".join(clauses) + ")"
+
+    if k == 2:
+        clauses = []
+        triples = [(0,1,2), (0,1,3), (0,2,3), (1,2,3)]
+        for (i,j,l) in triples:
+            clauses.append(f"(or {nx[i]} {nx[j]} {nx[l]})")  # not all 3 true
+        for (i,j,l) in triples:
+            clauses.append(f"(or {x[i]} {x[j]} {x[l]})")      # not all 3 false
+        return "(and " + " ".join(clauses) + ")"
+
+    raise ValueError("k must be 0..4")
+
+
+def degree_0_or_2(edges_at_vertex):
+    # allow degree 0 or 2 at each vertex
+    if len(edges_at_vertex) == 0:
+        return "(and)"
+    if len(edges_at_vertex) == 1:
+        return f"(not (On {edges_at_vertex[0]}))"
+
+    nx = [f"(not (On {e}))" for e in edges_at_vertex]
+    all_off = "(and " + " ".join(nx) + ")"
+
+    pairs = []
+    m = len(edges_at_vertex)
+    for i in range(m):
+        for j in range(i + 1, m):
+            parts = []
+            for k in range(m):
+                e = edges_at_vertex[k]
+                parts.append(f"(On {e})" if (k == i or k == j) else f"(not (On {e}))")
+            pairs.append("(and " + " ".join(parts) + ")")
+
+    # avoid unary (or X)
+    exactly_2 = pairs[0] if len(pairs) == 1 else "(or " + " ".join(pairs) + ")"
+    return "(or " + all_off + " " + exactly_2 + ")"
+
+
+# =============================
+# Build instance
+# =============================
 cells, edges, incident = build_grid(H, W)
 vertices, vtx_incident = build_vertices(H, W)
 clues = parse_clues(clue_input)
 
 for c in clues:
     if c not in incident:
-        raise ValueError(f"Unknown cell {c}")
+        raise ValueError(f"Unknown cell {c}. Valid cells: {list(incident.keys())}")
 
 domain = set(map(r, cells + edges + ["zero", "one", "two", "three", "four"]))
 
@@ -164,105 +249,15 @@ start = set(
     )
 )
 
-# =========================
-# NEW: compact “exactly k of 4” to avoid giant (or (and ...) ...) goals
-# (Keeps your overall structure the same, just changes goal generation.)
-# =========================
-def exactly_k_of_4(edges4, k: int) -> str:
-    x  = [f"(On {e})" for e in edges4]
-    nx = [f"(not (On {e}))" for e in edges4]
 
-    if k == 0:
-        return "(and " + " ".join(nx) + ")"
-    if k == 4:
-        return "(and " + " ".join(x) + ")"
-
-    # k==3: exactly one is false
-    if k == 3:
-        clauses = []
-        clauses.append("(or " + " ".join(nx) + ")")  # at least one false
-        # at most one false: no pair can both be false -> (or xi xj)
-        for i in range(4):
-            for j in range(i + 1, 4):
-                clauses.append(f"(or {x[i]} {x[j]})")
-        return "(and " + " ".join(clauses) + ")"
-
-    # k==1: exactly one is true
-    if k == 1:
-        clauses = []
-        clauses.append("(or " + " ".join(x) + ")")  # at least one true
-        # at most one true: no pair can both be true -> (or ¬xi ¬xj)
-        for i in range(4):
-            for j in range(i + 1, 4):
-                clauses.append(f"(or {nx[i]} {nx[j]})")
-        return "(and " + " ".join(clauses) + ")"
-
-    # k==2: (at most 2) AND (at least 2)
-    if k == 2:
-        clauses = []
-        triples = [(0,1,2), (0,1,3), (0,2,3), (1,2,3)]
-        # at most 2: no triple all true -> (or ¬xi ¬xj ¬xk)
-        for (i,j,l) in triples:
-            clauses.append(f"(or {nx[i]} {nx[j]} {nx[l]})")
-        # at least 2: no triple all false -> (or xi xj xk)
-        for (i,j,l) in triples:
-            clauses.append(f"(or {x[i]} {x[j]} {x[l]})")
-        return "(and " + " ".join(clauses) + ")"
-
-    raise ValueError("k must be 0..4")
-
-# =========================
-# UPDATED: goal_from_clue now uses compact encoding
-# =========================
 def goal_from_clue(cell):
-    es = incident[cell]  # always 4 edges for a cell
+    es = incident[cell]
     clue = clues[cell]
     k_map = {"zero":0, "one":1, "two":2, "three":3, "four":4}
     return exactly_k_of_4(es, k_map[clue])
 
-# =========================
-# NEW: degree(0 or 2) at each vertex
-# (kept your original “enumerate pairs” style, but fixes unary (or) case)
-# =========================
-def degree_0_or_2(edges_at_vertex):
-    # vertex degree is allowed to be 0 or 2 (no endpoints, no T-junctions)
 
-    # 0 edges incident (shouldn't happen in grids, but safe)
-    if len(edges_at_vertex) == 0:
-        return "(and)"
-
-    # 1 incident edge: must be off
-    if len(edges_at_vertex) == 1:
-        return f"(not (On {edges_at_vertex[0]}))"
-
-    nx = [f"(not (On {e}))" for e in edges_at_vertex]
-    all_off = "(and " + " ".join(nx) + ")"
-
-    # exactly 2 on (enumerate pairs)
-    pairs = []
-    m = len(edges_at_vertex)
-    for i in range(m):
-        for j in range(i + 1, m):
-            parts = []
-            for k in range(m):
-                e = edges_at_vertex[k]
-                if k == i or k == j:
-                    parts.append(f"(On {e})")
-                else:
-                    parts.append(f"(not (On {e}))")
-            pairs.append("(and " + " ".join(parts) + ")")
-
-    # IMPORTANT: avoid unary (or X) which can crash your version
-    if len(pairs) == 1:
-        exactly_2 = pairs[0]
-    else:
-        exactly_2 = "(or " + " ".join(pairs) + ")"
-
-    return "(or " + all_off + " " + exactly_2 + ")"
-
-# =========================
-# Build clue goal string (avoids unary (and ...))
-# =========================
+# clue goals (avoid unary and)
 clue_goals = [goal_from_clue(c) for c in clues.keys()]
 if len(clue_goals) == 0:
     raise ValueError("Need at least one clue to form a goal.")
@@ -271,23 +266,21 @@ elif len(clue_goals) == 1:
 else:
     clue_goal_str = "(and " + " ".join(clue_goals) + ")"
 
-# =========================
-# Build vertex degree goals
-# =========================
+# vertex goals
 vertex_goals = [degree_0_or_2(vtx_incident[v]) for v in vertices]
 
-# =========================
-# NEW: require at least one edge ON (prevents empty solution)
-# =========================
+# non-empty loop
 nonempty_goal = "(or " + " ".join(f"(On {e})" for e in edges) + ")"
 
-# =========================
-# Combine all goals (avoids unary (and ...))
-# =========================
+# final goal
 all_goals = [clue_goal_str] + vertex_goals + [nonempty_goal]
 goal_str = all_goals[0] if len(all_goals) == 1 else "(and " + " ".join(all_goals) + ")"
 goal = r(goal_str)
 
+
+# =============================
+# Solve + print
+# =============================
 sst = SST_Prover()
 
 plan = run_spectra(
