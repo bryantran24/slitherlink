@@ -230,8 +230,8 @@ actions = [
     Action(
         r("(Draw ?e)"),
         precondition=r("(and (Edge ?e) (not (On ?e)))"),
-        additions={r("(On ?e)")},
-        deletions={r("(not (On ?e))")},
+        additions=[r("(On ?e)")],            # CHANGED
+        deletions=[r("(not (On ?e))")],      # CHANGED
     )
 ]
 
@@ -267,9 +267,9 @@ constraint_goal = r(goal_str)  # CHANGED: keep the real constraints separately
 actions.append(
     Action(
         r("(Finish)"),
-        precondition=constraint_goal,     # CHANGED
-        additions={r("(Done)")},
-        deletions=set(),
+        precondition=constraint_goal,
+        additions=[r("(Done)")],   # CHANGED: list instead of set
+        deletions=[],              # CHANGED: empty list instead of set()
     )
 )
 goal = r("(Done)")                        # final goal
