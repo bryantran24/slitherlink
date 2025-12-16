@@ -6,15 +6,12 @@ os.environ["EPROVER_HOME"] = "./eprover/"
 from shadowprover.syntax import *
 from shadowprover.reasoners.planner import Action
 from shadowprover.syntax.reader import r
-
 from shadowprover.experimental.sst_prover import SST_Prover
 from shadowprover.reasoners.planner import run_spectra
 
 
-clue_input = "c00 3"
-
-def normalize_clue_token(tok: str) -> str:
-    tok = tok.strip().lower()
+def normalize_clue_token(tok) -> str:
+    tok = str(tok).strip().lower()
     if tok in {"zero", "one", "two", "three", "four"}:
         return tok
     if tok == "0": return "zero"
@@ -23,56 +20,6 @@ def normalize_clue_token(tok: str) -> str:
     if tok == "3": return "three"
     if tok == "4": return "four"
     raise ValueError(f"Bad clue token: {tok}")
-
-cell_name, clue_tok = clue_input.split()
-clue_tok = normalize_clue_token(clue_tok)
-
-domain = {
-    r("c00"),
-    r("three"),
-    r("h00"),
-    r("h01"),
-    r("v00"),
-    r("v01"),
-}
-
-incident = {"c00": ["h00", "h01", "v00", "v01"]}
-clues = {cell_name: clue_tok}
-
-background = set(
-    map(
-        r,
-        [
-            "(Cell c00)",
-            f"(Clue {cell_name} {clue_tok})",
-
-            "(Edge h00)", "(Edge h01)", "(Edge v00)", "(Edge v01)",
-            "(Incident h00 c00)",
-            "(Incident h01 c00)",
-            "(Incident v00 c00)",
-            "(Incident v01 c00)",
-        ],
-    )
-)
-
-actions = [
-    Action(
-        r("(Draw ?e)"),
-        precondition=r("(and (Edge ?e) (Undrawn ?e))"),
-        additions={r("(On ?e)")},
-        deletions={r("(Undrawn ?e)"), r("(not (On ?e))")},
-    )
-]
-
-start = set(
-    map(
-        r,
-        [
-            "(Undrawn h00)", "(Undrawn h01)", "(Undrawn v00)", "(Undrawn v01)",
-            "(not (On h00))", "(not (On h01))", "(not (On v00))", "(not (On v01))",
-        ],
-    )
-)
 
 def goal_from_clue(cell):
     clue = clues[cell]
@@ -105,31 +52,6 @@ def goal_from_clue(cell):
 
     raise ValueError(f"Unsupported clue: {clue}")
 
-goal_str = goal_from_clue(cell_name)
-goal = r(goal_str)
-
-sst = SST_Prover()
-
-plan = run_spectra(
-    domain,
-    background,
-    start,
-    goal,
-    actions,
-    sst.get_cached_shadow_prover2(),
-    verbose=False,
-)[0]
-
-print("CLUE INPUT:", clue_input)
-print("GOAL:", goal_str)
-print("PLAN:")
-if not plan:
-    print("  No plan found")
-else:
-    for i, step in enumerate(plan, 1):
-        print(i, step)
-
-
 def edges_on_from_plan(plan_steps):
     on = set()
     for step in plan_steps:
@@ -141,7 +63,7 @@ def edges_on_from_plan(plan_steps):
             on.add(parts[1])
     return on
 
-def print_1x1_slitherlink(on_edges, clue=None):
+def print_ascii(on_edges, clue=None):
     dot = "●"
     h = "───"
     v = "│"
@@ -156,8 +78,94 @@ def print_1x1_slitherlink(on_edges, clue=None):
     print(mid)
     print(bot)
 
-if plan:
-    on_edges = edges_on_from_plan(plan)
-    clue_char = {"zero":"0","one":"1","two":"2","three":"3","four":"4"}[clue_tok]
-    print("\nASCII SOLUTION:")
-    print_1x1_slitherlink(on_edges, clue=clue_char)
+
+if __name__ == "__main__":
+    
+    clue_input = (0, 0, 3)
+    
+    r0, c0, clue_val = clue_input
+    cell_name = f"c{r0}{c0}"
+    clue_tok = normalize_clue_token(clue_val)
+
+    domain = {
+        r(cell_name),
+        r(clue_tok),
+        r("h00"), r("h01"),
+        r("v00"), r("v01"),
+    }
+
+    incident = {
+        cell_name: ["h00", "h01", "v00", "v01"]
+    }
+
+    clues = {cell_name: clue_tok}
+
+    background = set(
+        map(
+            r,
+            [
+                f"(Cell {cell_name})",
+                f"(Clue {cell_name} {clue_tok})",
+
+                "(Edge h00)", "(Edge h01)", 
+                "(Edge v00)", "(Edge v01)",
+                
+                f"(Incident h00 {cell_name})",
+                f"(Incident h01 {cell_name})",
+                f"(Incident v00 {cell_name})",
+                f"(Incident v01 {cell_name})",
+            ],
+        )
+    )
+
+    actions = [
+        Action(
+            r("(Draw ?e)"),
+            precondition=r("(and (Edge ?e) (Undrawn ?e))"),
+            additions={r("(On ?e)")},
+            deletions={r("(Undrawn ?e)"), r("(not (On ?e))")},
+        )
+    ]
+
+    start = set(
+        map(
+            r,
+            [
+                "(Undrawn h00)", "(Undrawn h01)", 
+                "(Undrawn v00)", "(Undrawn v01)",
+                "(not (On h00))", "(not (On h01))", 
+                "(not (On v00))", "(not (On v01))",
+            ],
+        )
+    )
+    
+    goal_str = goal_from_clue(cell_name)
+    goal = r(goal_str)
+
+    sst = SST_Prover()
+
+    plan = run_spectra(
+        domain,
+        background,
+        start,
+        goal,
+        actions,
+        sst.get_cached_shadow_prover2(),
+        verbose=False,
+    )[0]
+
+    print("CLUE INPUT:", clue_input)
+    print("GOAL:", goal_str)
+    print("PLAN:")
+    if not plan:
+        print("  No plan found")
+    else:
+        for i, step in enumerate(plan, 1):
+            print(i, step)
+
+
+    if plan:
+        on_edges = edges_on_from_plan(plan)
+        clue_char = {"zero":"0","one":"1","two":"2","three":"3","four":"4"}[clue_tok]
+        print("\nASCII SOLUTION:")
+        print_ascii(on_edges, clue=clue_char)

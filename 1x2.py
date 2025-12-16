@@ -1,5 +1,4 @@
 import os
-import itertools
 
 os.environ["EPROVER_HOME"] = "./eprover/"
 
@@ -12,50 +11,29 @@ from shadowprover.reasoners.planner import run_spectra
 
 import time
 
-start_time = time.perf_counter()
-
-
-H, W = 1, 2
-
-clue_input = []
-# clue_input = [("c00", 4), ("c01", 1), ("c10", 1), ("c11", 4)]
-# clue_input = [("c00", 4)]
-
-
 def normalize_clue_token(val) -> str:
     val = str(val).strip().lower()
     if val in {"zero", "one", "two", "three", "four"}:
         return val
-    if val == "0":
-        return "zero"
-    if val == "1":
-        return "one"
-    if val == "2":
-        return "two"
-    if val == "3":
-        return "three"
-    if val == "4":
-        return "four"
+    if val == "0": return "zero"
+    if val == "1": return "one"
+    if val == "2": return "two"
+    if val == "3": return "three"
+    if val == "4": return "four"
     raise ValueError(f"Bad clue token: {val}")
 
 
-def parse_clues(clue_pairs):
+def parse_clues(clue_triples):
     clues = {}
-    for cell, val in clue_pairs:
+    for rr, cc, val in clue_triples:
+        cell = f"c{rr}{cc}"
         clues[cell] = normalize_clue_token(val)
     return clues
 
 
-def cell_name(r, c):
-    return f"c{r}{c}"
-
-
-def h_name(r, c):
-    return f"h{r}{c}"
-
-
-def v_name(r, c):
-    return f"v{r}{c}"
+def cell_name(rr, cc): return f"c{rr}{cc}"
+def h_name(rr, cc): return f"h{rr}{cc}"
+def v_name(rr, cc): return f"v{rr}{cc}"
 
 
 def build_grid(H, W):
@@ -74,10 +52,10 @@ def build_grid(H, W):
     for r in range(H):
         for c in range(W):
             incident[cell_name(r, c)] = [
-                h_name(r, c),  # top
-                h_name(r + 1, c),  # bottom
-                v_name(r, c),  # left
-                v_name(r, c + 1),  # right
+                h_name(r, c),       # top
+                h_name(r + 1, c),   # bottom
+                v_name(r, c),       # left
+                v_name(r, c + 1),   # right
             ]
     return cells, edges, incident
 
@@ -121,7 +99,7 @@ def edges_on_from_plan(plan_steps):
     return on
 
 
-def print_slitherlink_ascii(H, W, on_edges, clues):
+def print_ascii(H, W, on_edges, clues):
     dot, HBAR, VBAR, SPACE = "●", "───", "│", "   "
     clue_char = {"zero": "0", "one": "1", "two": "2", "three": "3", "four": "4"}
 
@@ -205,49 +183,8 @@ def degree_0_or_2(edges_at_vertex):
                 parts.append(f"(On {e})" if (k == i or k == j) else f"(not (On {e}))")
             pairs.append("(and " + " ".join(parts) + ")")
 
-    # avoid (or X)
     exactly_2 = pairs[0] if len(pairs) == 1 else "(or " + " ".join(pairs) + ")"
     return "(or " + all_off + " " + exactly_2 + ")"
-
-
-cells, edges, incident = build_grid(H, W)
-vertices, vtx_incident = build_vertices(H, W)
-clues = parse_clues(clue_input)
-
-for c in clues:
-    if c not in incident:
-        raise ValueError(f"Unknown cell {c}. Valid cells: {list(incident.keys())}")
-
-domain = set(map(r, edges))
-
-background = set(
-    # map(
-    #     r,
-    #     (
-    #         # [f"(Cell {c})" for c in cells] +
-    #         [f"(Edge {e})" for e in edges]
-    #         # + [f"(Clue {c} {clue})" for c, clue in clues.items()]
-    #     ),
-    # )
-)
-print("Domain", domain)
-print("Background", background)
-
-actions = [
-    Action(
-        r("(Draw ?e)"),
-        precondition=r("(not (On ?e))"),
-        additions={r("(On ?e)")},
-        deletions={r("(not (On ?e))")},
-    )
-]
-
-start = set(
-    map(
-        r,
-        [f"(not (On {e}))" for e in edges],
-    )
-)
 
 
 def goal_from_clue(cell):
@@ -257,54 +194,103 @@ def goal_from_clue(cell):
     return exactly_k_of_4(es, k_map[clue])
 
 
-# clue goals
-clue_goals = [goal_from_clue(c) for c in clues.keys()]
-if len(clue_goals) == 0:
-    raise ValueError("Need at least one clue to form a goal.")
-elif len(clue_goals) == 1:
-    clue_goal_str = clue_goals[0]
-else:
-    clue_goal_str = "(and " + " ".join(clue_goals) + ")"
+if __name__ == "__main__":
+    
+    start_time = time.perf_counter()
 
-# vertex goals
-vertex_goals = [degree_0_or_2(vtx_incident[v]) for v in vertices]
+    H, W = 1, 2
 
-# non-empty loop so at least one edge must be drawn.
-nonempty_goal = "(or " + " ".join(f"(On {e})" for e in edges) + ")"
+    clue_input = [(0, 0, 3), (0, 1, 3)]
+    
+    
+    cells, edges, incident = build_grid(H, W)
+    vertices, vtx_incident = build_vertices(H, W)
+    clues = parse_clues(clue_input)
 
-# final goal
-all_goals = [clue_goal_str] + vertex_goals + [nonempty_goal]
-goal_str = all_goals[0] if len(all_goals) == 1 else "(and " + " ".join(all_goals) + ")"
-goal = r(goal_str)
+    for c in clues:
+        if c not in incident:
+            raise ValueError(f"Unknown cell {c}. Valid cells: {list(incident.keys())}")
 
-print("Goal", goal)
+    domain = set(map(r, edges))
 
-sst = SST_Prover()
+    background = set(
+        # map(
+        #     r,
+        #     (
+        #         # [f"(Cell {c})" for c in cells] +
+        #         [f"(Edge {e})" for e in edges]
+        #         # + [f"(Clue {c} {clue})" for c, clue in clues.items()]
+        #     ),
+        # )
+    )
+    print("Domain", domain)
+    print("Background", background)
 
-plan = run_spectra(
-    domain,
-    background,
-    start,
-    goal,
-    actions,
-    sst.get_cached_shadow_prover2(),
-    verbose=False,
-)[0]
+    actions = [
+        Action(
+            r("(Draw ?e)"),
+            precondition=r("(not (On ?e))"),
+            additions={r("(On ?e)")},
+            deletions={r("(not (On ?e))")},
+        )
+    ]
 
-print("GRID:", f"{H}x{W}")
-print("CLUES:", clue_input)
-print("GOAL:", goal_str)
-print("PLAN:")
-if not plan:
-    print("  No plan found")
-else:
-    for i, step in enumerate(plan, 1):
-        print(i, step)
+    start = set(
+        map(
+            r,
+            [f"(not (On {e}))" for e in edges],
+        )
+    )
+    
+    
+    # clue goals
+    clue_goals = [goal_from_clue(c) for c in clues.keys()]
+    if len(clue_goals) == 0:
+        raise ValueError("Need at least one clue to form a goal.")
+    elif len(clue_goals) == 1:
+        clue_goal_str = clue_goals[0]
+    else:
+        clue_goal_str = "(and " + " ".join(clue_goals) + ")"
 
-    print("\nASCII SOLUTION:")
-    print_slitherlink_ascii(H, W, edges_on_from_plan(plan), clues)
+    # vertex goals
+    vertex_goals = [degree_0_or_2(vtx_incident[v]) for v in vertices]
 
-end_time = time.perf_counter()
-elapsed_time = end_time - start_time
+    # non-empty loop so at least one edge must be drawn.
+    nonempty_goal = "(or " + " ".join(f"(On {e})" for e in edges) + ")"
 
-print(f"Elapsed time: {elapsed_time:.4f} seconds")
+    # final goal
+    all_goals = [clue_goal_str] + vertex_goals + [nonempty_goal]
+    goal_str = all_goals[0] if len(all_goals) == 1 else "(and " + " ".join(all_goals) + ")"
+    goal = r(goal_str)
+
+    print("Goal", goal)
+
+    sst = SST_Prover()
+
+    plan = run_spectra(
+        domain,
+        background,
+        start,
+        goal,
+        actions,
+        sst.get_cached_shadow_prover2(),
+        verbose=False,
+    )[0]
+
+    print("GRID:", f"{H}x{W}")
+    print("CLUES:", clue_input)
+    print("GOAL:", goal_str)
+    print("PLAN:")
+    if not plan:
+        print("  No plan found")
+    else:
+        for i, step in enumerate(plan, 1):
+            print(i, step)
+
+        print("\nASCII SOLUTION:")
+        print_ascii(H, W, edges_on_from_plan(plan), clues)
+
+    end_time = time.perf_counter()
+    elapsed_time = end_time - start_time
+
+    print(f"Elapsed time: {elapsed_time:.4f} seconds")
