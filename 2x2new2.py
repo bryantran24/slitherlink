@@ -279,7 +279,7 @@ for i, e in enumerate(edge_order):
             r(f"(Draw_{i} {e})"), 
             precondition=r(f"(and (Ready {s_i}) (Edge {e}) (Undrawn {e}))"),
             additions={r(f"(On {e})"), r(f"(Ready {s_n})")},
-            deletions={r(f"(Ready {s_i})"), r(f"(Undrawn {e})"), r(f"(not (On {e}))")},
+            deletions={r(f"(Ready {s_i})"), r(f"(Undrawn {e}))"), r(f"(not (On {e}))")},
         )
     )
 
