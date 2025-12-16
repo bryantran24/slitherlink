@@ -231,9 +231,10 @@ actions = [
         r("(Draw ?e)"),
         precondition=r("(and (Edge ?e) (not (On ?e)))"),
         additions={r("(On ?e)")},
-        deletions={r("(not (On ?e)))")},
+        deletions={r("(not (On ?e))")},
     )
 ]
+
 
 def goal_from_clue(cell):
     es = incident[cell]
