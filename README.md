@@ -43,7 +43,7 @@ HEIGHT=1
 ```
 
 For Shadow Prover, run `python nxnfinal.py`.
-For BFS, run `python nxnfinal.py`.
+For BFS, run `python nxnbfs.py`.
 
 Our variation of the puzzle accepts multiple separate loops, and a puzzle without any clues has infinite valid solutions.
 
