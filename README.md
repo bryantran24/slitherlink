@@ -21,9 +21,11 @@ cd eprover
 make rebuild
 ```
 
-## Input
+## Usage
 
 The puzzle and instructions for the game can be found at <https://www.puzzle-loop.com/>
+
+The inputs can be edited in each file:
 
 ```
 # Syntax (row number, col number): clue number
@@ -39,6 +41,9 @@ HEIGHT=1
 ●───●   ●
 
 ```
+
+For Shadow Prover, run `python nxnfinal.py`.
+For BFS, run `python nxnfinal.py`.
 
 Our variation of the puzzle accepts multiple separate loops, and a puzzle without any clues has infinite valid solutions.
 

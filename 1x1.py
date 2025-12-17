@@ -14,17 +14,29 @@ def normalize_clue_token(tok) -> str:
     tok = str(tok).strip().lower()
     if tok in {"zero", "one", "two", "three", "four"}:
         return tok
-    if tok == "0": return "zero"
-    if tok == "1": return "one"
-    if tok == "2": return "two"
-    if tok == "3": return "three"
-    if tok == "4": return "four"
+    if tok == "0":
+        return "zero"
+    if tok == "1":
+        return "one"
+    if tok == "2":
+        return "two"
+    if tok == "3":
+        return "three"
+    if tok == "4":
+        return "four"
     raise ValueError(f"Bad clue token: {tok}")
 
 
-def cell_name(rr, cc): return f"c{rr}{cc}"
-def h_name(rr, cc): return f"h{rr}{cc}"
-def v_name(rr, cc): return f"v{rr}{cc}"
+def cell_name(rr, cc):
+    return f"c{rr}{cc}"
+
+
+def h_name(rr, cc):
+    return f"h{rr}{cc}"
+
+
+def v_name(rr, cc):
+    return f"v{rr}{cc}"
 
 
 def parse_clues(clue_triples):
@@ -32,7 +44,6 @@ def parse_clues(clue_triples):
     for rr, cc, val in clue_triples:
         clues[cell_name(rr, cc)] = normalize_clue_token(val)
     return clues
-
 
 
 def build_grid(H, W):
@@ -49,10 +60,10 @@ def build_grid(H, W):
     for r in range(H):
         for c in range(W):
             incident[cell_name(r, c)] = [
-                h_name(r, c),         # top
-                h_name(r + 1, c),     # bottom
-                v_name(r, c),         # left
-                v_name(r, c + 1),     # right
+                h_name(r, c),  # top
+                h_name(r + 1, c),  # bottom
+                v_name(r, c),  # left
+                v_name(r, c + 1),  # right
             ]
     return cells, edges, incident
 
@@ -116,7 +127,7 @@ def exactly_k_of_4(edges4, k: int) -> str:
         for i, j, l in triples:
             clauses.append(f"(or {nx[i]} {nx[j]} {nx[l]})")  # not all 3 true
         for i, j, l in triples:
-            clauses.append(f"(or {x[i]} {x[j]} {x[l]})")    # not all 3 false
+            clauses.append(f"(or {x[i]} {x[j]} {x[l]})")  # not all 3 false
         return "(and " + " ".join(clauses) + ")"
 
     raise ValueError("k must be 0..4")
@@ -169,9 +180,11 @@ def print_1x1_ascii(on_edges, clue=None):
     print(mid)
     print(bot)
 
+
 if __name__ == "__main__":
     H, W = 1, 1
 
+    # Format: (row, col, clue)
     clue_input = [(0, 0, 4)]
 
     cells, edges, incident = build_grid(H, W)
@@ -199,14 +212,24 @@ if __name__ == "__main__":
         for cell, clue_tok in clues.items():
             clue_goals.append(exactly_k_of_4(incident[cell], k_map[clue_tok]))
 
-    clue_goal_str = "(and)" if not clue_goals else (clue_goals[0] if len(clue_goals) == 1 else "(and " + " ".join(clue_goals) + ")")
+    clue_goal_str = (
+        "(and)"
+        if not clue_goals
+        else (
+            clue_goals[0]
+            if len(clue_goals) == 1
+            else "(and " + " ".join(clue_goals) + ")"
+        )
+    )
 
     vertex_goals = [degree_0_or_2(vtx_incident[v]) for v in vertices]
 
     # Force a non-empty loop
     nonempty_goal = "(or " + " ".join(f"(On {e})" for e in edges) + ")"
 
-    goal_str = "(and " + " ".join([clue_goal_str] + vertex_goals + [nonempty_goal]) + ")"
+    goal_str = (
+        "(and " + " ".join([clue_goal_str] + vertex_goals + [nonempty_goal]) + ")"
+    )
     goal = r(goal_str)
 
     sst = SST_Prover()
@@ -234,7 +257,13 @@ if __name__ == "__main__":
         if clues:
             # only 1 cell in 1x1
             clue_tok = clues["c00"]
-            clue_char = {"zero": "0", "one": "1", "two": "2", "three": "3", "four": "4"}[clue_tok]
+            clue_char = {
+                "zero": "0",
+                "one": "1",
+                "two": "2",
+                "three": "3",
+                "four": "4",
+            }[clue_tok]
 
         print("\nASCII SOLUTION:")
         print_1x1_ascii(on_edges, clue=clue_char)

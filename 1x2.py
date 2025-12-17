@@ -11,15 +11,21 @@ from shadowprover.reasoners.planner import run_spectra
 
 import time
 
+
 def normalize_clue_token(val) -> str:
     val = str(val).strip().lower()
     if val in {"zero", "one", "two", "three", "four"}:
         return val
-    if val == "0": return "zero"
-    if val == "1": return "one"
-    if val == "2": return "two"
-    if val == "3": return "three"
-    if val == "4": return "four"
+    if val == "0":
+        return "zero"
+    if val == "1":
+        return "one"
+    if val == "2":
+        return "two"
+    if val == "3":
+        return "three"
+    if val == "4":
+        return "four"
     raise ValueError(f"Bad clue token: {val}")
 
 
@@ -31,9 +37,16 @@ def parse_clues(clue_triples):
     return clues
 
 
-def cell_name(rr, cc): return f"c{rr}{cc}"
-def h_name(rr, cc): return f"h{rr}{cc}"
-def v_name(rr, cc): return f"v{rr}{cc}"
+def cell_name(rr, cc):
+    return f"c{rr}{cc}"
+
+
+def h_name(rr, cc):
+    return f"h{rr}{cc}"
+
+
+def v_name(rr, cc):
+    return f"v{rr}{cc}"
 
 
 def build_grid(H, W):
@@ -52,10 +65,10 @@ def build_grid(H, W):
     for r in range(H):
         for c in range(W):
             incident[cell_name(r, c)] = [
-                h_name(r, c),       # top
-                h_name(r + 1, c),   # bottom
-                v_name(r, c),       # left
-                v_name(r, c + 1),   # right
+                h_name(r, c),  # top
+                h_name(r + 1, c),  # bottom
+                v_name(r, c),  # left
+                v_name(r, c + 1),  # right
             ]
     return cells, edges, incident
 
@@ -195,14 +208,13 @@ def goal_from_clue(cell):
 
 
 if __name__ == "__main__":
-    
     start_time = time.perf_counter()
 
     H, W = 1, 2
 
+    # Format: (row, col, clue)
     clue_input = [(0, 0, 3), (0, 1, 3)]
-    
-    
+
     cells, edges, incident = build_grid(H, W)
     vertices, vtx_incident = build_vertices(H, W)
     clues = parse_clues(clue_input)
@@ -241,8 +253,7 @@ if __name__ == "__main__":
             [f"(not (On {e}))" for e in edges],
         )
     )
-    
-    
+
     # clue goals
     clue_goals = [goal_from_clue(c) for c in clues.keys()]
     if len(clue_goals) == 0:
@@ -260,7 +271,9 @@ if __name__ == "__main__":
 
     # final goal
     all_goals = [clue_goal_str] + vertex_goals + [nonempty_goal]
-    goal_str = all_goals[0] if len(all_goals) == 1 else "(and " + " ".join(all_goals) + ")"
+    goal_str = (
+        all_goals[0] if len(all_goals) == 1 else "(and " + " ".join(all_goals) + ")"
+    )
     goal = r(goal_str)
 
     print("Goal", goal)
@@ -294,3 +307,4 @@ if __name__ == "__main__":
     elapsed_time = end_time - start_time
 
     print(f"Elapsed time: {elapsed_time:.4f} seconds")
+

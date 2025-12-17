@@ -48,9 +48,9 @@ WIDTH = 1
 # WIDTH = 2
 
 # 2x2
-# puzzle_input = {(0, 0): 3, (1, 0): 2, (1, 1): 3}
-# HEIGHT = 2
-# WIDTH = 2
+puzzle_input = {(0, 0): 3, (1, 0): 2, (1, 1): 3}
+HEIGHT = 2
+WIDTH = 2
 
 TOTAL_EDGES = (HEIGHT * (WIDTH + 1)) + ((HEIGHT + 1) * WIDTH)
 
