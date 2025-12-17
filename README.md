@@ -61,6 +61,7 @@ We also have a solution for Slitherlink without Spectra utilizing a BFS algorith
 
 ## Tested Puzzles
 
+```
 ●───●
 │ 4 │
 ●───●
@@ -123,3 +124,5 @@ or
 │ 2   3 │
 ●───●───●
 BFS: 105.9s
+
+```
