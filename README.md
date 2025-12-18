@@ -55,7 +55,7 @@ When extending the model to **2×2** grids, performance became a major issue. Ev
 
 This project shows that Slitherlink can be modeled as a planning problem, but that the approach does not scale well without optimizations.
 
-Form the 1×1 and 1×2 solvers, we created a n×n solver that is adjustable to any grid size.
+From the 1×1 and 1×2 solvers, we created a n×n solver that is adjustable to any grid size.
 
 We also have a solution for Slitherlink without Spectra utilizing a BFS algorithm. The algorithm performs faster but is not as generalizable as Spectra.
 
